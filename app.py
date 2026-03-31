@@ -1,309 +1,295 @@
-import streamlit as st
-import os
 import time
+from typing import Dict, List
 
-# CẤU HÌNH TRANG 
-st.set_page_config(page_title="SmartDoc AI", layout="wide")
-
-# MOCK CONTROLLER (GIẢ LẬP ĐỂ CHỈ HIỆN GIAO DIỆN) 
-class MockRAGController:
-    def process_new_document(self, documents):
-        # Giả lập thời gian xử lý file để hiện Progress Bar
-        self.mock_documents = documents
-        return True
-
-    def answer_question(self, question):
-        # Trả về kết quả mẫu để test UI
-        return {
-            "answer": f"Đây là câu trả lời mẫu cho câu hỏi: '{question}'. Hiện tại hệ thống đang chạy ở chế độ 'Chỉ Giao diện' (UI Only).",
-            "context": [
-                type('obj', (object,), {
-                    'page_content': 'Đoạn văn bản mẫu được trích xuất từ tài liệu để kiểm tra hiển thị nguồn trích dẫn.',
-                    'metadata': {'page': 1, 'source': 'tai_lieu_mau.pdf'}
-                })
-            ]
-        }
+import streamlit as st
 
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-    .stApp { background-color: #F8F9FA; }
-
-    [data-testid="stSidebar"] { background-color: #2C2F33; }
-    [data-testid="stSidebar"] * { color: #FFFFFF !important; }
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3 { color: #FFC107 !important; }
-
-    .stButton > button {
-        background-color: #007BFF;
-        color: #FFFFFF;
-        border: none;
-        border-radius: 6px;
-        font-weight: 600;
-    }
-    .stButton > button:hover { background-color: #0056b3; color: #FFFFFF; }
-
-    [data-testid="stFileUploader"] {
-        border: 2px dashed #FFC107;
-        border-radius: 8px;
-        background-color: #fffdf0;
-        padding: 1rem;
-    }
-
-    .main-header {
-        background: linear-gradient(135deg, #007BFF, #0056b3);
-        color: #FFFFFF;
-        padding: 1.5rem 2rem;
-        border-radius: 10px;
-        margin-bottom: 1.5rem;
-        text-align: center;
-    }
-    .main-header h1 { margin: 0; font-size: 1.9rem; color: #FFFFFF; }
-    .main-header p  { margin: 0.3rem 0 0; opacity: 0.88; font-size: 0.95rem; }
-
-    .answer-box {
-        background-color: #FFFFFF;
-        border-left: 4px solid #007BFF;
-        border-radius: 8px;
-        padding: 1.2rem 1.5rem;
-        margin-top: 1rem;
-        color: #212529;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-    }
-
-    .citation-box {
-        background-color: #f0f4ff;
-        border: 1px solid #c8d8ff;
-        border-radius: 6px;
-        padding: 0.8rem 1rem;
-        margin-top: 0.4rem;
-        font-size: 0.83rem;
-        color: #212529;
-    }
-
-    .history-item {
-        background-color: #3a3f44;
-        border-radius: 6px;
-        padding: 0.6rem 0.8rem;
-        margin-bottom: 0.5rem;
-        font-size: 0.83rem;
-    }
-    .history-q { color: #FFC107 !important; font-weight: 600; }
-    .history-a { color: #cccccc !important; }
-
-    p, label, .stMarkdown { color: #212529; }
-</style>
-""", unsafe_allow_html=True)
-
-if "rag_controller" not in st.session_state:
-    # SỬA TẠI ĐÂY: Dùng Mock thay vì RAGController thật
-    st.session_state.rag_controller = MockRAGController() 
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "doc_processed" not in st.session_state:
-    st.session_state.doc_processed = False
-if "uploaded_filename" not in st.session_state:
-    st.session_state.uploaded_filename = None
-if "app_logs" not in st.session_state:
-    st.session_state.app_logs = []
-
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## SmartDoc AI")
-    st.markdown("---")
-
-    st.markdown("### Huong dan su dung")
-    st.markdown("""
-1. **Tai len** tai lieu PDF
-2. **Cho** he thong xu ly tai lieu
-3. **Dat cau hoi** ve noi dung
-""")
-    st.markdown("---")
-
-    st.markdown("### Cau hinh he thong")
-    st.markdown("""
-- **LLM:** Qwen2.5:7b (Ollama)
-- **Embedding:** MPNet 768-dim
-- **Search:** FAISS + MMR
-- **Ngon ngu:** Viet / Anh
-""")
-    st.markdown("---")
-
-    st.markdown("### Tai lieu hien tai")
-    if st.session_state.doc_processed and st.session_state.uploaded_filename:
-        st.success(st.session_state.uploaded_filename)
-    else:
-        st.info("Chua co tai lieu nao duoc tai len.")
-    st.markdown("---")
-
-    st.markdown("### Lich su hoi thoai")
-    if st.session_state.chat_history:
-        for item in reversed(st.session_state.chat_history):
-            q_short = item["question"][:60] + ("..." if len(item["question"]) > 60 else "")
-            a_short = item["answer"][:80] + ("..." if len(item["answer"]) > 80 else "")
-            st.markdown(f"""
-<div class="history-item">
-  <div class="history-q">Q: {q_short}</div>
-  <div class="history-a">A: {a_short}</div>
-</div>""", unsafe_allow_html=True)
-    else:
-        st.markdown("<small>Chua co cau hoi nao.</small>", unsafe_allow_html=True)
-
-    st.markdown("---")
-    with st.expander("Xem log he thong"):
-        if st.session_state.app_logs:
-            for log_line in st.session_state.app_logs[-12:]:
-                st.write(log_line)
-        else:
-            st.write("Chua co log nao.")
-
-    st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Xoa lich su", use_container_width=True):
-            st.session_state.chat_history = []
-            st.rerun()
-    with col2:
-        if st.button("Xoa tai lieu", use_container_width=True):
-            st.session_state.doc_processed = False
-            st.session_state.uploaded_filename = None
-            st.session_state.rag_controller = MockRAGController()
-            st.rerun()
-
-# ── MAIN AREA ─────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="main-header">
-    <h1>SmartDoc AI</h1>
-    <p>Intelligent Document Q&A System — Ho tro tieng Viet va tieng Anh</p>
-</div>
-""", unsafe_allow_html=True)
-
-# ── SECTION 1: UPLOAD ─────────────────────────────────────────────────────────
-st.markdown("### Tai tai lieu len")
-
-uploaded_file = st.file_uploader(
-    "Keo tha hoac chon file PDF",
-    type=["pdf"],
-    help="Chi ho tro dinh dang PDF. Kich thuoc khuyen nghi duoi 50MB."
+st.set_page_config(
+    page_title="SmartDoc AI",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-if uploaded_file is not None:
-    if uploaded_file.name != st.session_state.uploaded_filename:
-        st.info(f"Da chon: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)")
 
-        if st.button("Xu ly tai lieu", type="primary"):
-            progress = st.progress(0, text="Dang bat dau xu ly...")
-            st.session_state.app_logs.append(f"[INFO] Bat dau xu ly file {uploaded_file.name}")
-            try:
-                progress.progress(15, text="Dang doc file...")
-                st.session_state.app_logs.append("[INFO] Doc file PDF...")
-                time.sleep(0.15)
+def init_state() -> None:
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history: List[Dict[str, str]] = []
+    if "vector_ready" not in st.session_state:
+        st.session_state.vector_ready = False
+    if "uploaded_filename" not in st.session_state:
+        st.session_state.uploaded_filename = ""
+    if "last_answer" not in st.session_state:
+        st.session_state.last_answer = ""
+    if "last_citations" not in st.session_state:
+        st.session_state.last_citations: List[Dict[str, str]] = []
+    if "processing_done" not in st.session_state:
+        st.session_state.processing_done = False
 
-                progress.progress(35, text="Dang trich xuat noi dung PDF (demo)...")
-                st.session_state.app_logs.append("[INFO] Trich xuat noi dung (demo)...")
-                time.sleep(0.15)
 
-                progress.progress(55, text="Dang chia nho van ban (demo)...")
-                st.session_state.app_logs.append("[INFO] Chia nho van ban (demo)...")
-                time.sleep(0.15)
+def inject_styles() -> None:
+    st.markdown(
+        """
+        <style>
+            :root {
+                --primary: #007BFF;
+                --secondary: #FFC107;
+                --bg-main: #F8F9FA;
+                --bg-sidebar: #2C2F33;
+                --text-main: #212529;
+                --text-light: #FFFFFF;
+            }
 
-                progress.progress(75, text="Dang tao vector embeddings (demo)...")
-                st.session_state.app_logs.append("[INFO] Tao embeddings (demo)...")
-                time.sleep(0.15)
+            .stApp {
+                background-color: var(--bg-main);
+                color: var(--text-main);
+            }
 
-                documents = [
-                    type('obj', (object,), {
-                        'page_content': 'Noi dung demo tu file PDF',
-                        'metadata': {'page': 1, 'source': uploaded_file.name}
-                    })
-                ]
-                st.session_state.rag_controller.process_new_document(documents)
+            [data-testid="stSidebar"] {
+                background-color: var(--bg-sidebar) !important;
+            }
 
-                progress.progress(100, text="Hoan tat!")
-                st.session_state.app_logs.append("[INFO] Hoan tat xu ly tai lieu.")
-                st.session_state.doc_processed = True
-                st.session_state.uploaded_filename = uploaded_file.name
+            [data-testid="stSidebar"] * {
+                color: var(--text-light) !important;
+            }
 
-                st.success(f"Da xu ly **{uploaded_file.name}** thanh cong! ({len(documents)} chunks)")
-                st.rerun()
+            [data-testid="stSidebar"] .stButton > button {
+                border: 1px solid rgba(255, 255, 255, 0.25);
+            }
 
-            except Exception as e:
-                progress.empty()
-                st.session_state.app_logs.append(f"[ERROR] Loi khi xu ly tai lieu: {str(e)}")
-                st.error(f"Loi khi xu ly tai lieu: {str(e)}")
-                st.warning("Goi y: Kiem tra file PDF khong bi hong hoac duoc bao ve bang mat khau.")
-    else:
-        st.success(f"Tai lieu **{uploaded_file.name}** da san sang de hoi dap.")
-else:
-    if not st.session_state.doc_processed:
-        st.markdown("""
-<div style="text-align:center; padding:2rem; color:#6c757d;">
-    <h3>Hay tai len mot tai lieu PDF de bat dau</h3>
-    <p>He thong ho tro tieng Viet va tieng Anh</p>
-</div>
-""", unsafe_allow_html=True)
+            h1, h2, h3, h4, h5, h6 {
+                color: var(--text-main);
+            }
 
-# ── SECTION 2: HOI DAP 
-if st.session_state.doc_processed:
-    st.markdown("---")
-    st.markdown("### Dat cau hoi")
+            .main-header {
+                margin-top: 0.5rem;
+                margin-bottom: 1.5rem;
+                border-bottom: 1px solid #e3e6ea;
+                padding-bottom: 0.75rem;
+            }
 
-    question = st.text_input(
-        "Nhap cau hoi cua ban",
-        placeholder="Vi du: Noi dung chinh cua tai lieu la gi?",
-        label_visibility="collapsed"
+            .card {
+                background: #ffffff;
+                border: 1px solid #e5e7eb;
+                border-radius: 14px;
+                padding: 1rem 1.1rem;
+                margin-bottom: 0.9rem;
+            }
+
+            .step-chip {
+                display: inline-block;
+                font-size: 0.84rem;
+                padding: 0.25rem 0.65rem;
+                border-radius: 999px;
+                border: 1px solid #ced4da;
+                margin-right: 0.35rem;
+                margin-bottom: 0.4rem;
+                background: #fff;
+            }
+
+            .citation-item {
+                background: #fffef4;
+                border-left: 4px solid var(--secondary);
+                padding: 0.5rem 0.75rem;
+                margin-bottom: 0.45rem;
+                border-radius: 0 8px 8px 0;
+                color: #4a4a4a;
+                font-size: 0.95rem;
+            }
+
+            .stButton > button[kind="primary"] {
+                background-color: var(--primary) !important;
+                border-color: var(--primary) !important;
+                color: #fff !important;
+            }
+
+            div[data-testid="stFileUploaderDropzone"] {
+                border: 2px dashed #ced4da;
+                border-radius: 12px;
+                background: #ffffff;
+                padding: 0.8rem;
+            }
+
+            .upload-note {
+                color: #6c757d;
+                font-size: 0.9rem;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if question:
-        with st.spinner("Dang xu ly cau hoi..."):
-            try:
-                answer = st.session_state.rag_controller.answer_question(question)
 
-                # Luu vao lich su
-                sources = []
-                try:
-                    # Lay sources neu controller tra ve dict
-                    if isinstance(answer, dict):
-                        sources = answer.get("context", [])
-                        answer = answer.get("answer", "")
-                except Exception:
-                    pass
+def fake_process_document() -> None:
+    progress_placeholder = st.empty()
+    status_placeholder = st.empty()
 
-                st.session_state.chat_history.append({
-                    "question": question,
-                    "answer": answer,
-                    "sources": sources
-                })
+    status_placeholder.info("Dang phan tich tai lieu va tao vector store...")
+    progress = progress_placeholder.progress(0)
 
-                # Hien thi cau tra loi
-                st.markdown("### Cau tra loi")
-                st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
+    for i in range(1, 101, 10):
+        time.sleep(0.08)
+        progress.progress(i)
 
-                # Hien thi citation neu co
-                if sources:
-                    with st.expander("Xem nguon trich dan"):
-                        for i, doc in enumerate(sources, 1):
-                            page = doc.metadata.get("page", "N/A")
-                            source_file = doc.metadata.get("source", "tai lieu")
-                            content_preview = doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
-                            st.markdown(f"""
-<div class="citation-box">
-  <strong>Nguon {i}</strong> — Trang: {page} | File: {os.path.basename(str(source_file))}<br>
-  <em>{content_preview}</em>
-</div>""", unsafe_allow_html=True)
+    st.session_state.vector_ready = True
+    st.session_state.processing_done = True
+    status_placeholder.success("Xu ly tai lieu thanh cong. San sang hoi dap.")
 
-            except Exception as e:
-                st.error(f"Loi xu ly cau hoi: {str(e)}")
-                st.warning("Vui long kiem tra Ollama dang chay va thu lai.")
 
-# ── SECTION 3: LICH SU DAY DU 
-if st.session_state.chat_history:
-    st.markdown("---")
-    with st.expander("Xem toan bo lich su hoi thoai"):
-        for i, item in enumerate(st.session_state.chat_history, 1):
-            st.markdown(f"**Cau hoi {i}:** {item['question']}")
-            st.markdown(f'<div class="answer-box">{item["answer"]}</div>', unsafe_allow_html=True)
-            st.markdown("")
+def fake_answer(question: str) -> Dict[str, object]:
+    short = question.strip()[:140] if question.strip() else "Noi dung cau hoi"
+    answer = (
+        f"Day la cau tra loi mau cho: '{short}'. "
+        "Phan nay se duoc thay bang ket qua RAG + LLM khi ban ket noi backend."
+    )
+    citations = [
+        {"page": "3", "location": "Doan 2", "snippet": "Noi dung lien quan den chu de trong cau hoi."},
+        {"page": "7", "location": "Bang 1", "snippet": "Du lieu ho tro cho ket luan trong cau tra loi."},
+    ]
+    return {"answer": answer, "citations": citations}
+
+
+def render_sidebar() -> None:
+    with st.sidebar:
+        st.markdown("## SmartDoc AI")
+        st.caption("Hoi dap tai lieu thong minh voi RAG + Qwen2.5")
+
+        st.markdown("---")
+        st.markdown("### Huong dan")
+        st.markdown("1. Tai len file PDF")
+        st.markdown("2. Doi he thong xu ly")
+        st.markdown("3. Dat cau hoi va xem tra loi")
+
+        st.markdown("---")
+        st.markdown("### Cau hinh he thong")
+        model_name = st.selectbox("Mo hinh LLM", ["Qwen2.5:7b", "Qwen2.5:14b"], index=0)
+        chunk_size = st.slider("Chunk Size", min_value=100, max_value=3000, value=500, step=50)
+        chunk_overlap = st.slider("Chunk Overlap", min_value=0, max_value=499, value=40, step=5)
+        top_k = st.slider("Top-k", min_value=1, max_value=10, value=3, step=1)
+
+        st.caption(
+            f"Cau hinh hien tai: {model_name} | chunk={chunk_size} | overlap={chunk_overlap} | top_k={top_k}"
+        )
+
+        st.markdown("---")
+        st.markdown("### Lich su hoi thoai")
+        if not st.session_state.chat_history:
+            st.caption("Chua co hoi thoai nao.")
+        else:
+            for i, item in enumerate(reversed(st.session_state.chat_history[-8:]), start=1):
+                st.markdown(f"**{i}.** {item['question'][:60]}...")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Clear History", use_container_width=True):
+                st.session_state.chat_history = []
+                st.session_state.last_answer = ""
+                st.session_state.last_citations = []
+                st.success("Da xoa lich su hoi thoai.")
+        with col2:
+            if st.button("Clear Vector Store", use_container_width=True):
+                st.session_state.vector_ready = False
+                st.session_state.processing_done = False
+                st.session_state.uploaded_filename = ""
+                st.warning("Da xoa tai lieu va vector store.")
+
+
+def render_main() -> None:
+    st.markdown(
+        """
+        <div class="main-header">
+            <h1 style="margin-bottom: 0.25rem;">SmartDoc AI</h1>
+            <p style="margin: 0; color: #6c757d;">Hoi dap tai lieu thong minh voi RAG + Qwen2.5</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div style="margin-bottom: 0.8rem;">
+            <span class="step-chip">Landing</span>
+            <span class="step-chip">Upload</span>
+            <span class="step-chip">Processing</span>
+            <span class="step-chip">Query</span>
+            <span class="step-chip">Response</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("Tai len tai lieu PDF")
+    uploaded_file = st.file_uploader(
+        "Keo tha file PDF vao day hoac bam de chon file",
+        type=["pdf"],
+        help="Ho tro dinh dang PDF, toi da 50MB.",
+    )
+    st.markdown('<p class="upload-note">Ho tro keo-tha, hiem thi tien trinh va thong bao loi than thien.</p>', unsafe_allow_html=True)
+
+    if uploaded_file is not None:
+        st.session_state.uploaded_filename = uploaded_file.name
+        st.success(f"Da tai len: {uploaded_file.name}")
+        if st.button("Bat dau xu ly tai lieu", type="primary"):
+            fake_process_document()
+    else:
+        st.info("Vui long tai len file PDF de bat dau.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("Nhap cau hoi")
+    question = st.text_input(
+        "Dat cau hoi ve noi dung tai lieu",
+        placeholder="Vi du: Tom tat muc tieu chinh cua tai lieu la gi?",
+    )
+    ask_disabled = not st.session_state.vector_ready or not question.strip()
+    if st.button("Gui cau hoi", type="primary", disabled=ask_disabled):
+        with st.spinner("Mo hinh dang suy luan, vui long doi..."):
+            time.sleep(0.8)
+            response = fake_answer(question)
+            st.session_state.last_answer = str(response["answer"])
+            st.session_state.last_citations = list(response["citations"])
+            st.session_state.chat_history.append(
+                {"question": question.strip(), "answer": st.session_state.last_answer}
+            )
+        st.success("Da nhan duoc cau tra loi.")
+
+    if not st.session_state.vector_ready:
+        st.caption("Can xu ly tai lieu truoc khi dat cau hoi.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("Cau tra loi")
+    if st.session_state.last_answer:
+        st.write(st.session_state.last_answer)
+    else:
+        st.info("Cau tra loi se hien thi o day sau khi ban gui cau hoi.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("Trich dan (Citation)")
+    if st.session_state.last_citations:
+        for c in st.session_state.last_citations:
+            st.markdown(
+                f"""
+                <div class="citation-item">
+                    <strong>Trang {c["page"]}</strong> - {c["location"]}<br/>
+                    <span>{c["snippet"]}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    else:
+        st.caption("Chua co citation. Hay gui cau hoi de xem vi tri thong tin trong PDF.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def main() -> None:
+    init_state()
+    inject_styles()
+    render_sidebar()
+    render_main()
+
+
+if __name__ == "__main__":
+    main()
