@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(
     page_title="SmartDoc AI",
-    page_icon="📄",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -47,10 +47,15 @@ def inject_styles() -> None:
 
             [data-testid="stSidebar"] {
                 background-color: var(--bg-sidebar) !important;
+                overflow-x: hidden !important;
             }
 
             [data-testid="stSidebar"] * {
                 color: var(--text-light) !important;
+            }
+
+            [data-testid="stSidebarContent"] {
+                overflow-x: hidden !important;
             }
 
             [data-testid="stSidebar"] .stButton > button {
@@ -154,13 +159,13 @@ def render_sidebar() -> None:
         st.markdown("## SmartDoc AI")
         st.caption("Hoi dap tai lieu thong minh voi RAG + Qwen2.5")
 
-        st.markdown("---")
+     
         st.markdown("### Huong dan")
         st.markdown("1. Tai len file PDF")
         st.markdown("2. Doi he thong xu ly")
         st.markdown("3. Dat cau hoi va xem tra loi")
 
-        st.markdown("---")
+        
         st.markdown("### Cau hinh he thong")
         model_name = st.selectbox("Mo hinh LLM", ["Qwen2.5:7b", "Qwen2.5:14b"], index=0)
         chunk_size = st.slider("Chunk Size", min_value=100, max_value=3000, value=500, step=50)
@@ -171,7 +176,7 @@ def render_sidebar() -> None:
             f"Cau hinh hien tai: {model_name} | chunk={chunk_size} | overlap={chunk_overlap} | top_k={top_k}"
         )
 
-        st.markdown("---")
+   
         st.markdown("### Lich su hoi thoai")
         if not st.session_state.chat_history:
             st.caption("Chua co hoi thoai nao.")
@@ -179,19 +184,17 @@ def render_sidebar() -> None:
             for i, item in enumerate(reversed(st.session_state.chat_history[-8:]), start=1):
                 st.markdown(f"**{i}.** {item['question'][:60]}...")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Clear History", use_container_width=True):
-                st.session_state.chat_history = []
-                st.session_state.last_answer = ""
-                st.session_state.last_citations = []
-                st.success("Da xoa lich su hoi thoai.")
-        with col2:
-            if st.button("Clear Vector Store", use_container_width=True):
-                st.session_state.vector_ready = False
-                st.session_state.processing_done = False
-                st.session_state.uploaded_filename = ""
-                st.warning("Da xoa tai lieu va vector store.")
+        if st.button("Clear History", use_container_width=True):
+            st.session_state.chat_history = []
+            st.session_state.last_answer = ""
+            st.session_state.last_citations = []
+            st.success("Da xoa lich su hoi thoai.")
+
+        if st.button("Clear Vector Store", use_container_width=True):
+            st.session_state.vector_ready = False
+            st.session_state.processing_done = False
+            st.session_state.uploaded_filename = ""
+            st.warning("Da xoa tai lieu va vector store.")
 
 
 def render_main() -> None:
@@ -218,7 +221,6 @@ def render_main() -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Tai len tai lieu PDF")
     uploaded_file = st.file_uploader(
         "Keo tha file PDF vao day hoac bam de chon file",
@@ -234,9 +236,6 @@ def render_main() -> None:
             fake_process_document()
     else:
         st.info("Vui long tai len file PDF de bat dau.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Nhap cau hoi")
     question = st.text_input(
         "Dat cau hoi ve noi dung tai lieu",
@@ -256,17 +255,11 @@ def render_main() -> None:
 
     if not st.session_state.vector_ready:
         st.caption("Can xu ly tai lieu truoc khi dat cau hoi.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Cau tra loi")
     if st.session_state.last_answer:
         st.write(st.session_state.last_answer)
     else:
         st.info("Cau tra loi se hien thi o day sau khi ban gui cau hoi.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Trich dan (Citation)")
     if st.session_state.last_citations:
         for c in st.session_state.last_citations:
@@ -281,7 +274,6 @@ def render_main() -> None:
             )
     else:
         st.caption("Chua co citation. Hay gui cau hoi de xem vi tri thong tin trong PDF.")
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def main() -> None:
