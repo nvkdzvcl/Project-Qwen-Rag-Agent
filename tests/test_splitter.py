@@ -11,7 +11,7 @@ def verify_splitter():
     # 1. Cấu hình tham số kiểm tra
     CHUNK_SIZE = 1000
     CHUNK_OVERLAP = 200
-    FILE_PATH = "test_data/Chương 3.docx"
+    FILE_PATH = "test_data/TH2 - HQTCSDL - QL ban hang.pdf" 
 
     if not os.path.exists(FILE_PATH):
         print(f"❌ Lỗi: Không tìm thấy file {FILE_PATH}")
@@ -20,7 +20,7 @@ def verify_splitter():
     # 2. Nạp tài liệu (Sử dụng hàm thường để lấy text nhanh)
     print(f"--- Đang nạp file: {os.path.basename(FILE_PATH)} ---")
     loader = SmartDocLoader()
-    raw_docs = loader.load(FILE_PATH)
+    raw_docs = loader.load_pdf_with_ocr(FILE_PATH)  # Dùng OCR để đảm bảo có text dù là PDF scan
 
     # 3. Chạy Splitter
     splitter = SmartDocSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
