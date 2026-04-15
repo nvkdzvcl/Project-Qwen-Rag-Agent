@@ -11,7 +11,6 @@ def run_comprehensive_test():
     print(f"⏱ Thời gian khởi tạo LLM & Pipeline: {time.time() - start_init:.2f}s\n")
     
     # Giả lập dữ liệu phủ cả 3 Test Cases của thầy
-    # ĐÃ SỬA: Thêm metadata giả để hệ thống không bị lỗi khi bóc tách nguồn (Câu 5)
     dummy_docs = [
         Document(
             page_content="Technical manual: To install the software, first download the package, extract it to the C: drive, and run setup.exe as Administrator.",
@@ -31,8 +30,7 @@ def run_comprehensive_test():
     controller.process_new_document(dummy_docs)
     print("-" * 50)
 
-    # Khởi tạo lịch sử chat rỗng cho các test case độc lập
-    empty_history = []
+    # ĐÃ XÓA: empty_history = [] vì Controller mới tự quản lý memory bằng session_id
 
     # ---------------------------------------------------------
     # TEST CASE 1: Simple Factual Question 
@@ -42,8 +40,8 @@ def run_comprehensive_test():
     print(f"❓ Câu hỏi: {tc1_query}")
     start_q1 = time.time()
     
-    # ĐÃ SỬA: Truyền thêm mảng empty_history và bóc tách object trả về
-    response1 = controller.answer_question(tc1_query, empty_history)
+    # ĐÃ SỬA: Truyền session_id riêng biệt thay vì empty_history
+    response1 = controller.answer_question(tc1_query, session_id="test_case_1")
     
     print(f"💡 Trả lời: {response1.get('answer', 'Lỗi không có câu trả lời')}")
     print(f"📑 Nguồn trích xuất: {response1.get('sources', [])}")
@@ -58,8 +56,8 @@ def run_comprehensive_test():
     print(f"❓ Câu hỏi: {tc2_query}")
     start_q2 = time.time()
     
-    # ĐÃ SỬA: Truyền thêm mảng empty_history và bóc tách object trả về
-    response2 = controller.answer_question(tc2_query, empty_history)
+    # ĐÃ SỬA: Truyền session_id riêng biệt thay vì empty_history
+    response2 = controller.answer_question(tc2_query, session_id="test_case_2")
     
     print(f"💡 Trả lời: {response2.get('answer', 'Lỗi không có câu trả lời')}")
     print(f"📑 Nguồn trích xuất: {response2.get('sources', [])}")
@@ -74,8 +72,8 @@ def run_comprehensive_test():
     print(f"❓ Câu hỏi: {tc3_query}")
     start_q3 = time.time()
     
-    # ĐÃ SỬA: Truyền thêm mảng empty_history và bóc tách object trả về
-    response3 = controller.answer_question(tc3_query, empty_history)
+    # ĐÃ SỬA: Truyền session_id riêng biệt thay vì empty_history
+    response3 = controller.answer_question(tc3_query, session_id="test_case_3")
     
     print(f"💡 Trả lời: {response3.get('answer', 'Lỗi không có câu trả lời')}")
     print(f"📑 Nguồn trích xuất: {response3.get('sources', [])}")
