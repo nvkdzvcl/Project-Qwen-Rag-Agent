@@ -44,20 +44,21 @@ class RAGController:
             logger.error(f"❌ {error_msg}")
             return False, error_msg
 
-    def answer_question(self, question, chat_history):
+    def answer_question(self, question, session_id="default_session", filter_dict=None):
         """
         Hàm này Role 1 sẽ gọi khi người dùng đặt câu hỏi.
-        Yêu cầu Role 1 truyền thêm tham số chat_history (List các messages).
+        Frontend chỉ cần định danh user bằng session_id.
+        Ví dụ filter_dict: {"doc_type": "pdf", "source": "chuong1.pdf"}
         """
         try:
             if not self.pipeline.vector_store:
                 return {"answer": "Lỗi: Vui lòng upload tài liệu trước khi đặt câu hỏi!", "sources": []}
             
-            logger.info(f"Query: {question}")
+            logger.info(f"Query: '{question}' | Filter: '{filter_dict}'")
         
             # Ủy quyền toàn bộ quy trình phức tạp (Reranking, Hybrid, Memory) cho Pipeline
             # Kết quả trả về là một Dictionary chứa cả 'answer' và 'sources'
-            response = self.pipeline.ask_question(question, chat_history)
+            response = self.pipeline.ask_question(question, session_id=session_id, filter_dict=filter_dict)
             return response
         
         except ConnectionError as ce:
@@ -71,3 +72,19 @@ class RAGController:
     def clear_all_data(self):
         """Hàm API để Role 1 gọi khi bấm nút Xóa Database (Câu 3)"""
         return self.pipeline.clear_database()
+    
+    # ĐÃ BỔ SUNG: API để chạy Performance Benchmark (Câu 7)
+    def run_performance_benchmark(self, question):
+        """
+        Chạy so sánh tốc độ giữa Vector Search và Hybrid Search.
+        Có thể gắn vào một nút bấm ẩn trên UI dành cho giảng viên kiểm tra.
+        """
+        return self.pipeline.benchmark_hybrid_vs_vector(question)
+    
+    # ĐÃ BỔ SUNG: API để chạy Performance Benchmark Reranker (Câu 9)
+    def run_reranker_benchmark(self, question, filter_dict=None):
+        """
+        Đo lường độ trễ (latency) giữa Bi-encoder và Cross-encoder.
+        Đáp ứng tiêu chí so sánh hiệu năng của Câu 9.
+        """
+        return self.pipeline.benchmark_reranker_vs_bi_encoder(question, filter_dict)
