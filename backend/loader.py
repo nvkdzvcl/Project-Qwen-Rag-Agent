@@ -88,51 +88,7 @@ class SmartDocLoader:
             logger.error(f"Lỗi khi đọc file Word {file_path}: {str(e)}")
             raise
         
-    
-    # Load Excel
-    def _load_excel(self, file_path: str):
-    """
-    Trích xuất dữ liệu từ Excel, lưu tên Sheet vào Metadata.
-    Biến mỗi hàng dữ liệu thành một Document để AI dễ truy vấn.
-    """
-    try:
-        logger.info(f"--- Đang trích xuất Excel: {os.path.basename(file_path)} ---")
-        
-        # Đọc tất cả các sheets cùng lúc
-        excel_file = pd.ExcelFile(file_path)
-        documents = []
-
-        for sheet_name in excel_file.sheet_names:
-            # Đọc từng sheet thành DataFrame
-            df = excel_file.parse(sheet_name)
-            
-            # Loại bỏ các hàng hoàn toàn trống
-            df = df.dropna(how='all')
-            
-            # Chuyển đổi toàn bộ Sheet thành định dạng văn bản (Markdown) 
-            # để AI hiểu cấu trúc hàng/cột tốt nhất
-            sheet_content = df.to_markdown(index=False)
-            
-            # Tạo metadata chi tiết
-            metadata = {
-                "source_type": "excel",
-                "file_name": os.path.basename(file_path),
-                "sheet_name": sheet_name,  # Lưu tên Sheet ở đây
-                "total_rows": len(df),
-                "total_columns": len(df.columns)
-            }
-            
-            # Đóng gói thành Document
-            doc = Document(page_content=sheet_content, metadata=metadata)
-            documents.append(doc)
-
-        logger.info(f" Đã nạp {len(documents)} sheets từ file Excel.")
-        return documents
-
-    except Exception as e:
-        logger.error(f" Lỗi khi xử lý file Excel: {str(e)}")
-        raise
-    
+          
     # Phương thức Public API để nạp file
     def load(self, file_path: str):
         """Phương thức Public API"""
