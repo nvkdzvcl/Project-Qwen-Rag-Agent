@@ -11,18 +11,28 @@ def run_comprehensive_test():
     print(f"⏱ Thời gian khởi tạo LLM & Pipeline: {time.time() - start_init:.2f}s\n")
     
     # Giả lập dữ liệu phủ cả 3 Test Cases của thầy
+    # ĐÃ SỬA: Thêm metadata giả để hệ thống không bị lỗi khi bóc tách nguồn (Câu 5)
     dummy_docs = [
-        # Dữ liệu cho Test Case 1 (Technical manual)
-        Document(page_content="Technical manual: To install the software, first download the package, extract it to the C: drive, and run setup.exe as Administrator."),
-        # Dữ liệu cho Test Case 2 (Research paper)
-        Document(page_content="Research findings: The integration of Agentic RAG reduces hallucination rates by 40%. The implication is that enterprise systems can now automate customer support with higher reliability without human oversight."),
-        # Dữ liệu cho Test Case 3 (Cooking recipe)
-        Document(page_content="Cooking recipe: To make a perfect omelette, beat 3 eggs with a pinch of salt, heat butter in a pan, and cook for 2 minutes on medium heat.")
+        Document(
+            page_content="Technical manual: To install the software, first download the package, extract it to the C: drive, and run setup.exe as Administrator.",
+            metadata={"source": "C:/docs/install_guide.pdf", "page": 0}
+        ),
+        Document(
+            page_content="Research findings: The integration of Agentic RAG reduces hallucination rates by 40%. The implication is that enterprise systems can now automate customer support with higher reliability without human oversight.",
+            metadata={"source": "C:/docs/research_paper_2026.pdf", "page": 5}
+        ),
+        Document(
+            page_content="Cooking recipe: To make a perfect omelette, beat 3 eggs with a pinch of salt, heat butter in a pan, and cook for 2 minutes on medium heat.",
+            metadata={"source": "C:/docs/masterchef_recipe.pdf", "page": 12}
+        )
     ]
     
     print("Mô phỏng nạp tài liệu PDF...")
     controller.process_new_document(dummy_docs)
     print("-" * 50)
+
+    # Khởi tạo lịch sử chat rỗng cho các test case độc lập
+    empty_history = []
 
     # ---------------------------------------------------------
     # TEST CASE 1: Simple Factual Question 
@@ -31,8 +41,12 @@ def run_comprehensive_test():
     tc1_query = "What is the installation procedure?"
     print(f"❓ Câu hỏi: {tc1_query}")
     start_q1 = time.time()
-    ans1 = controller.answer_question(tc1_query)
-    print(f"💡 Trả lời: {ans1}")
+    
+    # ĐÃ SỬA: Truyền thêm mảng empty_history và bóc tách object trả về
+    response1 = controller.answer_question(tc1_query, empty_history)
+    
+    print(f"💡 Trả lời: {response1.get('answer', 'Lỗi không có câu trả lời')}")
+    print(f"📑 Nguồn trích xuất: {response1.get('sources', [])}")
     print(f"⏱ Thời gian xử lý & sinh câu trả lời: {time.time() - start_q1:.2f}s")
     print("-" * 50)
 
@@ -43,8 +57,12 @@ def run_comprehensive_test():
     tc2_query = "What are the main findings of the research and their implications?"
     print(f"❓ Câu hỏi: {tc2_query}")
     start_q2 = time.time()
-    ans2 = controller.answer_question(tc2_query)
-    print(f"💡 Trả lời: {ans2}")
+    
+    # ĐÃ SỬA: Truyền thêm mảng empty_history và bóc tách object trả về
+    response2 = controller.answer_question(tc2_query, empty_history)
+    
+    print(f"💡 Trả lời: {response2.get('answer', 'Lỗi không có câu trả lời')}")
+    print(f"📑 Nguồn trích xuất: {response2.get('sources', [])}")
     print(f"⏱ Thời gian xử lý & sinh câu trả lời: {time.time() - start_q2:.2f}s")
     print("-" * 50)
 
@@ -55,8 +73,12 @@ def run_comprehensive_test():
     tc3_query = "How to solve differential equations?"
     print(f"❓ Câu hỏi: {tc3_query}")
     start_q3 = time.time()
-    ans3 = controller.answer_question(tc3_query)
-    print(f"💡 Trả lời: {ans3}")
+    
+    # ĐÃ SỬA: Truyền thêm mảng empty_history và bóc tách object trả về
+    response3 = controller.answer_question(tc3_query, empty_history)
+    
+    print(f"💡 Trả lời: {response3.get('answer', 'Lỗi không có câu trả lời')}")
+    print(f"📑 Nguồn trích xuất: {response3.get('sources', [])}")
     print(f"⏱ Thời gian xử lý & sinh câu trả lời: {time.time() - start_q3:.2f}s")
     print("-" * 50)
 
