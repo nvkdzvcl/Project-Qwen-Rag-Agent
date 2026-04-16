@@ -99,15 +99,25 @@ class RagPipeline:
         
         logger.info("⏳ Đang tải mô hình Cross-Encoder Reranker (Quá trình này tốn khá nhiều RAM)...")
         try:
-            # Sử dụng BAAI/bge-reranker-v2-m3 vì nó tối ưu rất tốt cho tiếng Việt
-            # ĐÃ SỬA CÂU 9: Tối ưu hóa Latency bằng Model Quantization (Half-precision)
-            # Truyền torch_dtype='float16' giúp giảm 50% lượng RAM tiêu thụ và tăng tốc độ suy luận đáng kể
-            # Đây là kỹ thuật tối ưu hóa phần cứng (Hardware Optimization) cực kỳ ghi điểm
-            self.cross_encoder_model = HuggingFaceCrossEncoder(
-                model_name="BAAI/bge-reranker-v2-m3",
-                model_kwargs={"torch_dtype": "float16"} 
-            )
-            logger.info("✅ Tải Reranker thành công (Đã áp dụng Quantization float16 để giảm Latency)!")
+            # Sử dụng BAAI/bge-reranker-v2-m3 vì nó tối ưu tốt cho tiếng Việt.
+            # Một số phiên bản sentence-transformers chưa hỗ trợ torch_dtype trong CrossEncoder,
+            # nên cần fallback an toàn để tránh crash lúc khởi động hệ thống.
+            try:
+                self.cross_encoder_model = HuggingFaceCrossEncoder(
+                    model_name="BAAI/bge-reranker-v2-m3",
+                    model_kwargs={"torch_dtype": "float16"}
+                )
+                logger.info("✅ Tải Reranker thành công (float16).")
+            except TypeError as te:
+                logger.warning(
+                    "⚠️ CrossEncoder chưa hỗ trợ torch_dtype ở môi trường hiện tại. "
+                    "Tự động fallback về cấu hình mặc định. Chi tiết: %s",
+                    str(te),
+                )
+                self.cross_encoder_model = HuggingFaceCrossEncoder(
+                    model_name="BAAI/bge-reranker-v2-m3"
+                )
+                logger.info("✅ Tải Reranker thành công (fallback mặc định).")
         except Exception as e:
             logger.error(f"❌ Lỗi khi tải mô hình Reranker: {str(e)}", exc_info=True)
             self.cross_encoder_model = None
@@ -147,6 +157,38 @@ class RagPipeline:
             logger.error(f"❌ Lỗi khi nạp dữ liệu vào FAISS: {str(e)}")
             raise e
 
+    def _ensure_bm25_retriever(self) -> bool:
+        """
+        Đảm bảo BM25 retriever luôn sẵn sàng khi chạy chế độ hybrid.
+        - Ưu tiên dùng all_documents đã có trong RAM.
+        - Nếu thiếu, thử rút ngược từ FAISS docstore.
+        """
+        if getattr(self, "bm25_retriever", None) is not None:
+            return True
+
+        try:
+            if not self.all_documents and getattr(self, "vector_store", None) is not None:
+                if hasattr(self.vector_store, "docstore") and hasattr(self.vector_store.docstore, "_dict"):
+                    self.all_documents = list(self.vector_store.docstore._dict.values())
+                    logger.info(
+                        f"🔄 [BM25] Tự động khôi phục {len(self.all_documents)} chunks từ FAISS docstore."
+                    )
+
+            if not self.all_documents:
+                logger.warning("⚠️ [BM25] Không có all_documents để dựng lại BM25.")
+                return False
+
+            self.bm25_retriever = BM25Retriever.from_documents(self.all_documents)
+            self.bm25_retriever.k = 3
+            logger.info(
+                f"✅ [BM25] Đã dựng lại BM25 thành công từ {len(self.all_documents)} chunks."
+            )
+            return True
+        except Exception as e:
+            logger.error(f"❌ [BM25] Lỗi khi tự dựng lại BM25: {str(e)}", exc_info=True)
+            self.bm25_retriever = None
+            return False
+
     # ---------------------------------------------------------
     # ĐÁP ỨNG MỤC 7.2.4 & CÂU 7, 8, 9: FULL ADVANCED RETRIEVAL
     # ---------------------------------------------------------
@@ -175,15 +217,21 @@ class RagPipeline:
             base_retriever = None
             if search_type.lower() == "hybrid":
                 # Chế độ tìm kiếm lai (Câu 7)
-                if getattr(self, 'bm25_retriever', None) is None:
-                    logger.warning("⚠️ Không thể tạo Hybrid Retriever vì thiếu BM25.")
-                    raise ValueError("Dữ liệu BM25 chưa được nạp. Vui lòng kiểm tra lại quá trình load file.")
-                
                 # Áp dụng bộ lọc (base_search_kwargs) vào luồng FAISS (FAISS xử lý filter rất an toàn)
                 faiss_retriever = self.vector_store.as_retriever(search_kwargs=base_search_kwargs)
+
+                # BM25 có thể bị mất trạng thái khi reload/clear một phần.
+                # Thử tự dựng lại; nếu vẫn không được thì fallback về pure vector để không làm hỏng trải nghiệm hỏi đáp.
+                bm25_ready = self._ensure_bm25_retriever()
+                if not bm25_ready:
+                    logger.warning(
+                        "⚠️ Hybrid tạm thời chưa sẵn sàng do thiếu BM25. "
+                        "Fallback sang Vector Search để tránh lỗi cho người dùng."
+                    )
+                    base_retriever = faiss_retriever
                 
                 # ĐÃ SỬA LỖI 2: Xử lý logic lọc BM25 cực kỳ nghiêm ngặt (Strict Filtering)
-                if filter_dict:
+                if base_retriever is None and filter_dict:
                     logger.info("🗂️ Đang ép BM25 chỉ tìm kiếm trong vùng Metadata được cấp phép...")
                     
                     filtered_docs = []
@@ -219,7 +267,7 @@ class RagPipeline:
                             weights=[0.3, 0.7]
                         )
                         logger.info(f"✅ Khởi tạo Ensemble Retriever thành công (Đã lọc chuẩn xác {len(filtered_docs)} chunks cho BM25).")
-                else:
+                elif base_retriever is None:
                     base_retriever = EnsembleRetriever(
                         retrievers=[self.bm25_retriever, faiss_retriever],
                         weights=[0.3, 0.7]
@@ -405,6 +453,136 @@ class RagPipeline:
     # ---------------------------------------------------------
     # CẬP NHẬT HÀM TRUY VẤN CHÍNH (QUERY)
     # ---------------------------------------------------------
+    def _invoke_conversational_query(self, question: str, chat_history: list, filter_dict: dict = None) -> tuple[str, list]:
+        """
+        Chạy một lượt truy vấn conversational RAG và trả về (answer, source_documents).
+        """
+        conversational_chain = self.get_conversational_rag_chain(question, filter_dict=filter_dict)
+        response = conversational_chain.invoke({
+            "input": question,
+            "chat_history": chat_history
+        })
+        answer = str(response.get("answer", ""))
+        source_documents = response.get("context", [])
+        return answer, source_documents
+
+    def _extract_json_object(self, raw_text: str) -> dict | None:
+        """
+        Bóc tách JSON object từ text trả về của LLM (best-effort).
+        """
+        if not raw_text:
+            return None
+        start = raw_text.find("{")
+        end = raw_text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        candidate = raw_text[start:end + 1]
+        try:
+            parsed = json.loads(candidate)
+            return parsed if isinstance(parsed, dict) else None
+        except Exception:
+            return None
+
+    def _run_self_check(self, question: str, answer: str, source_documents: list) -> dict:
+        """
+        Self-check nhẹ để đánh giá mức bám ngữ cảnh và gợi ý retry query nếu cần.
+        """
+        if not self.llm:
+            return {
+                "need_retry": False,
+                "better_query": "",
+                "confidence": None,
+                "note": "LLM chưa sẵn sàng cho self-check.",
+            }
+
+        context_preview = "\n\n".join(
+            [
+                f"[Chunk {idx + 1}] {doc.page_content[:450]}"
+                for idx, doc in enumerate(source_documents[:3])
+            ]
+        )
+
+        check_prompt = (
+            "Bạn là bộ kiểm định chất lượng câu trả lời của hệ RAG.\n"
+            "Hãy đánh giá câu trả lời dựa trên ngữ cảnh truy xuất.\n"
+            "Trả về DUY NHẤT JSON object theo schema:\n"
+            "{\n"
+            '  "need_retry": true/false,\n'
+            '  "better_query": "string",\n'
+            '  "confidence": number,\n'
+            '  "note": "string"\n'
+            "}\n\n"
+            "Quy tắc:\n"
+            "- confidence trong [0,1]\n"
+            "- Nếu ngữ cảnh chưa đủ hoặc câu trả lời có nguy cơ sai, đặt need_retry=true.\n"
+            "- better_query là câu truy vấn cải tiến ngắn gọn, nếu không cần retry thì để rỗng.\n\n"
+            f"Câu hỏi người dùng: {question}\n\n"
+            f"Câu trả lời hiện tại: {answer}\n\n"
+            f"Ngữ cảnh truy xuất:\n{context_preview}"
+        )
+
+        try:
+            raw_result = self.llm.invoke(check_prompt)
+            raw_text = raw_result if isinstance(raw_result, str) else str(raw_result)
+            parsed = self._extract_json_object(raw_text)
+            if not parsed:
+                return {
+                    "need_retry": False,
+                    "better_query": "",
+                    "confidence": None,
+                    "note": "Không parse được JSON self-check, fallback heuristic.",
+                }
+
+            parsed_conf = parsed.get("confidence")
+            conf_value = None
+            if isinstance(parsed_conf, (int, float)):
+                conf_value = max(0.0, min(1.0, float(parsed_conf)))
+
+            return {
+                "need_retry": bool(parsed.get("need_retry", False)),
+                "better_query": str(parsed.get("better_query", "")).strip(),
+                "confidence": conf_value,
+                "note": str(parsed.get("note", "")).strip() or "Self-check completed.",
+            }
+        except Exception as e:
+            logger.warning(f"⚠️ Self-check thất bại, fallback heuristic. Chi tiết: {str(e)}")
+            return {
+                "need_retry": False,
+                "better_query": "",
+                "confidence": None,
+                "note": "Self-check gặp lỗi, fallback heuristic.",
+            }
+
+    def _calculate_confidence(self, question: str, answer: str, source_documents: list, self_check_conf: float | None = None) -> float:
+        """
+        Tính confidence score cho câu trả lời theo hướng heuristic + optional self-check score.
+        """
+        doc_score = min(len(source_documents), 3) / 3
+        relevance_score = 0.5 if source_documents else 0.0
+
+        if source_documents and getattr(self, "cross_encoder_model", None) is not None:
+            try:
+                pairs = [[question, doc.page_content] for doc in source_documents[:3]]
+                raw_scores = self.cross_encoder_model.score(pairs)
+                if raw_scores:
+                    relevance_score = sum(
+                        max(0.0, min(1.0, float(score))) for score in raw_scores
+                    ) / len(raw_scores)
+            except Exception as e:
+                logger.warning(f"⚠️ Không thể chấm relevance score bằng Cross-Encoder: {str(e)}")
+
+        confidence = 0.2 + 0.4 * doc_score + 0.4 * relevance_score
+
+        if isinstance(self_check_conf, (int, float)):
+            confidence = (confidence + max(0.0, min(1.0, float(self_check_conf)))) / 2
+
+        answer_lower = (answer or "").lower()
+        if "không biết" in answer_lower or "don't know" in answer_lower or "do not know" in answer_lower:
+            confidence = min(confidence, 0.30)
+
+        confidence = max(0.05, min(0.99, confidence))
+        return round(confidence, 2)
+
     def ask_question(self, question: str, session_id: str = "default_session", filter_dict: dict = None) -> dict:
         """
         Hàm chính để Role 1 gọi từ giao diện.
@@ -419,18 +597,11 @@ class RagPipeline:
         logger.info(f"💬 Nhận câu hỏi mới: '{question}'. Session: '{session_id}' | Độ dài lịch sử: {len(current_history)} tin nhắn.")
         
         try:
-            conversational_chain = self.get_conversational_rag_chain(question, filter_dict=filter_dict)
-            
-            # Chạy chuỗi RAG
-            # Input của LangChain Retrieval Chain mặc định là 'input' và 'chat_history'
-            response = conversational_chain.invoke({
-                "input": question,
-                "chat_history": current_history
-            })
-
-            # Trích xuất dữ liệu trả về cho Role 1 và Role 3 (metadata)
-            answer = response["answer"]
-            source_documents = response["context"] # Các chunks đã dùng để trả lời
+            answer, source_documents = self._invoke_conversational_query(
+                question=question,
+                chat_history=current_history,
+                filter_dict=filter_dict
+            )
 
             # =========================================================
             # ĐÃ BỔ SUNG LỖI SỐ 8: Log tường minh số lượng document lấy được
@@ -452,6 +623,115 @@ class RagPipeline:
         except Exception as e:
             logger.error(f"❌ Lỗi trong quá trình hội thoại: {str(e)}")
             return {"answer": f"Lỗi hệ thống: {str(e)}", "sources": []}
+
+    def ask_question_advanced(self, question: str, session_id: str = "default_session", filter_dict: dict = None) -> dict:
+        """
+        Luồng Advanced RAG:
+        1) Truy vấn RAG chuẩn
+        2) Self-check để đánh giá câu trả lời
+        3) Nếu cần, retry với query cải tiến
+        4) Trả thêm confidence score và metadata cho UI
+        """
+        if session_id not in self.backend_session_memory:
+            self.backend_session_memory[session_id] = []
+
+        current_history = self.backend_session_memory[session_id]
+        logger.info(
+            f"🚀 [Advanced] Nhận câu hỏi: '{question}'. Session: '{session_id}' | "
+            f"History length: {len(current_history)}"
+        )
+
+        used_retry = False
+        try:
+            # Lượt trả lời đầu tiên
+            answer, source_documents = self._invoke_conversational_query(
+                question=question,
+                chat_history=current_history,
+                filter_dict=filter_dict
+            )
+            logger.info(f"🔍 [Advanced] Lượt 1 truy xuất được {len(source_documents)} chunks.")
+
+            # Self-check
+            self_check = self._run_self_check(
+                question=question,
+                answer=answer,
+                source_documents=source_documents
+            )
+            logger.info(
+                f"🧪 [Advanced] Self-check | need_retry={self_check['need_retry']} | "
+                f"note='{self_check['note']}'"
+            )
+
+            # Retry nếu self-check yêu cầu
+            better_query = self_check.get("better_query", "")
+            if self_check.get("need_retry") and better_query:
+                try:
+                    retry_retriever = self.get_retriever(
+                        search_type="hybrid",
+                        base_k=10,
+                        final_top_k=3,
+                        filter_dict=filter_dict,
+                        use_reranker=True
+                    )
+                    retry_docs = retry_retriever.invoke(better_query)
+                    if retry_docs:
+                        qa_prompt = self._get_dynamic_prompt(question)
+                        qa_chain = create_stuff_documents_chain(self.llm, qa_prompt)
+                        retry_result = qa_chain.invoke({
+                            "input": question,
+                            "chat_history": current_history,
+                            "context": retry_docs
+                        })
+                        if isinstance(retry_result, str):
+                            answer = retry_result
+                        elif isinstance(retry_result, dict):
+                            answer = str(retry_result.get("answer", answer))
+                        source_documents = retry_docs
+                        used_retry = True
+                        logger.info(
+                            f"♻️ [Advanced] Retry thành công với better_query='{better_query}'. "
+                            f"Chunks sau retry: {len(source_documents)}"
+                        )
+                except Exception as e:
+                    logger.warning(f"⚠️ [Advanced] Retry không thành công, giữ kết quả lượt 1. Lỗi: {str(e)}")
+
+            confidence = self._calculate_confidence(
+                question=question,
+                answer=answer,
+                source_documents=source_documents,
+                self_check_conf=self_check.get("confidence")
+            )
+
+            self.backend_session_memory[session_id].append(HumanMessage(content=question))
+            self.backend_session_memory[session_id].append(AIMessage(content=answer))
+            self._save_chat_history()
+
+            logger.info(
+                f"✅ [Advanced] Hoàn tất trả lời. Confidence={confidence} | "
+                f"used_retry={used_retry}"
+            )
+            return {
+                "answer": answer,
+                "sources": self._extract_metadata(source_documents),
+                "confidence": confidence,
+                "advanced_meta": {
+                    "used_retry": used_retry,
+                    "self_check_note": self_check.get("note", ""),
+                    "better_query": better_query,
+                },
+            }
+        except Exception as e:
+            logger.error(f"❌ [Advanced] Lỗi trong quá trình hội thoại: {str(e)}", exc_info=True)
+            return {
+                "answer": f"Lỗi hệ thống (Advanced): {str(e)}",
+                "sources": [],
+                "confidence": 0.0,
+                "advanced_meta": {
+                    "used_retry": used_retry,
+                    "self_check_note": "Advanced pipeline failed.",
+                    "better_query": "",
+                },
+            }
 
     def _save_chat_history(self):
         """

@@ -89,7 +89,7 @@ class RAGController:
             logger.error(f"❌ {error_msg}")
             return False, error_msg
 
-    def answer_question(self, question, session_id="default_session", filter_dict=None):
+    def answer_question(self, question, session_id="default_session", filter_dict=None, advanced_mode=False):
         """
         Hàm này Role 1 sẽ gọi khi người dùng đặt câu hỏi.
         Frontend chỉ cần định danh user bằng session_id.
@@ -99,11 +99,24 @@ class RAGController:
             if not self.pipeline.vector_store:
                 return {"answer": "Lỗi: Vui lòng upload tài liệu trước khi đặt câu hỏi!", "sources": []}
             
-            logger.info(f"Query: '{question}' | Filter: '{filter_dict}'")
+            logger.info(
+                f"Query: '{question}' | Filter: '{filter_dict}' | Advanced: {advanced_mode}"
+            )
         
             # Ủy quyền toàn bộ quy trình phức tạp (Reranking, Hybrid, Memory) cho Pipeline
             # Kết quả trả về là một Dictionary chứa cả 'answer' và 'sources'
-            response = self.pipeline.ask_question(question, session_id=session_id, filter_dict=filter_dict)
+            if advanced_mode:
+                response = self.pipeline.ask_question_advanced(
+                    question,
+                    session_id=session_id,
+                    filter_dict=filter_dict
+                )
+            else:
+                response = self.pipeline.ask_question(
+                    question,
+                    session_id=session_id,
+                    filter_dict=filter_dict
+                )
             return response
         
         except ConnectionError as ce:

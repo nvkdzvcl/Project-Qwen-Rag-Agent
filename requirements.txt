@@ -10,6 +10,7 @@ ollama>=0.1.7
 
 # Vector search & Embedding
 faiss-cpu>=1.9.0
+rank-bm25>=0.2.2
 sentence-transformers>=2.6.0
 transformers>=4.38,<5
 accelerate>=0.25.0

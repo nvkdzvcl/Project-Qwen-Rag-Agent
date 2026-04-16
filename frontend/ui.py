@@ -60,6 +60,8 @@ def init_state() -> None:
         st.session_state.cfg_topk = 3
     if "cfg_model" not in st.session_state:
         st.session_state.cfg_model = "qwen2.5:7b"
+    if "cfg_advanced_mode" not in st.session_state:
+        st.session_state.cfg_advanced_mode = False
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +137,12 @@ def render_sidebar() -> None:
                   step=10, key="cfg_overlap")
         st.slider("Top-k", min_value=1, max_value=10, value=st.session_state.cfg_topk,
                   step=1, key="cfg_topk")
+        st.checkbox(
+            "Advanced RAG (self-check + confidence)",
+            value=st.session_state.cfg_advanced_mode,
+            key="cfg_advanced_mode",
+            help="Bật để dùng luồng tự kiểm tra câu trả lời và trả về confidence score.",
+        )
 
         st.markdown("### Lịch sử (gần đây)")
         hist = st.session_state.chat_history
@@ -286,6 +294,9 @@ def render_chat_section() -> None:
                 st.write(msg["question"])
             with st.chat_message("assistant", avatar="🤖"):
                 st.write(msg["answer"])
+                confidence = msg.get("confidence")
+                if isinstance(confidence, (int, float)):
+                    st.caption(f"Confidence: {float(confidence):.2f}")
                 cites = msg.get("citations", [])
                 if cites:
                     with st.expander(f"📎 {len(cites)} trích dẫn nguồn"):
@@ -317,6 +328,12 @@ def render_chat_section() -> None:
             placeholder="Ví dụ: Tóm tắt mục tiêu chính của tài liệu?",
             label_visibility="collapsed",
         )
+        advanced_mode = bool(st.session_state.cfg_advanced_mode)
+        st.caption(
+            "Che do hien tai: Advanced RAG"
+            if advanced_mode
+            else "Che do hien tai: Standard RAG"
+        )
         submitted = st.form_submit_button("🔍 Gửi câu hỏi", type="primary")
 
         if submitted and question.strip():
@@ -324,13 +341,16 @@ def render_chat_section() -> None:
                 result = st.session_state.rag_controller.answer_question(
                     question=question.strip(),
                     session_id=st.session_state.session_id,
+                    advanced_mode=bool(advanced_mode),
                 )
             answer = result.get("answer", "")
             citations = _sources_to_citations(result.get("sources", []))
+            confidence = result.get("confidence")
             st.session_state.chat_history.append({
                 "question": question.strip(),
                 "answer": answer,
                 "citations": citations,
+                "confidence": confidence if isinstance(confidence, (int, float)) else None,
             })
             st.rerun()
 
