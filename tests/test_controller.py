@@ -10,6 +10,11 @@ def run_comprehensive_test():
     controller = RAGController()
     print(f"⏱ Thời gian khởi tạo LLM & Pipeline: {time.time() - start_init:.2f}s\n")
     
+    # ĐÃ BỔ SUNG: Kéo thử log ra để xem hệ thống khởi tạo thế nào (và làm rỗng hàng đợi log)
+    init_logs = controller.get_system_logs()
+    for log in init_logs:
+        print(log)
+    
     # Giả lập dữ liệu phủ cả 3 Test Cases của thầy
     dummy_docs = [
         Document(
@@ -26,11 +31,13 @@ def run_comprehensive_test():
         )
     ]
     
-    print("Mô phỏng nạp tài liệu PDF...")
+    print("\n📦 Mô phỏng nạp tài liệu PDF...")
     controller.process_new_document(dummy_docs)
+    
+    # In log của quá trình nạp tài liệu
+    for log in controller.get_system_logs():
+        print(log)
     print("-" * 50)
-
-    # ĐÃ XÓA: empty_history = [] vì Controller mới tự quản lý memory bằng session_id
 
     # ---------------------------------------------------------
     # TEST CASE 1: Simple Factual Question 
@@ -40,12 +47,16 @@ def run_comprehensive_test():
     print(f"❓ Câu hỏi: {tc1_query}")
     start_q1 = time.time()
     
-    # ĐÃ SỬA: Truyền session_id riêng biệt thay vì empty_history
     response1 = controller.answer_question(tc1_query, session_id="test_case_1")
     
-    print(f"💡 Trả lời: {response1.get('answer', 'Lỗi không có câu trả lời')}")
-    print(f"📑 Nguồn trích xuất: {response1.get('sources', [])}")
+    print(f"\n💡 Trả lời: {response1.get('answer', 'Lỗi không có câu trả lời')}")
+    print(f"📑 Nguồn trích xuất: {len(response1.get('sources', []))} chunks")
     print(f"⏱ Thời gian xử lý & sinh câu trả lời: {time.time() - start_q1:.2f}s")
+    
+    # ĐÃ BỔ SUNG: In chi tiết Log hệ thống để thầy cô thấy AI đang làm gì
+    print("\n[🛠️ CHI TIẾT LOG HỆ THỐNG]")
+    for log in controller.get_system_logs():
+        print(log)
     print("-" * 50)
 
     # ---------------------------------------------------------
@@ -56,12 +67,15 @@ def run_comprehensive_test():
     print(f"❓ Câu hỏi: {tc2_query}")
     start_q2 = time.time()
     
-    # ĐÃ SỬA: Truyền session_id riêng biệt thay vì empty_history
     response2 = controller.answer_question(tc2_query, session_id="test_case_2")
     
-    print(f"💡 Trả lời: {response2.get('answer', 'Lỗi không có câu trả lời')}")
-    print(f"📑 Nguồn trích xuất: {response2.get('sources', [])}")
+    print(f"\n💡 Trả lời: {response2.get('answer', 'Lỗi không có câu trả lời')}")
+    print(f"📑 Nguồn trích xuất: {len(response2.get('sources', []))} chunks")
     print(f"⏱ Thời gian xử lý & sinh câu trả lời: {time.time() - start_q2:.2f}s")
+    
+    print("\n[🛠️ CHI TIẾT LOG HỆ THỐNG]")
+    for log in controller.get_system_logs():
+        print(log)
     print("-" * 50)
 
     # ---------------------------------------------------------
@@ -72,12 +86,15 @@ def run_comprehensive_test():
     print(f"❓ Câu hỏi: {tc3_query}")
     start_q3 = time.time()
     
-    # ĐÃ SỬA: Truyền session_id riêng biệt thay vì empty_history
     response3 = controller.answer_question(tc3_query, session_id="test_case_3")
     
-    print(f"💡 Trả lời: {response3.get('answer', 'Lỗi không có câu trả lời')}")
-    print(f"📑 Nguồn trích xuất: {response3.get('sources', [])}")
+    print(f"\n💡 Trả lời: {response3.get('answer', 'Lỗi không có câu trả lời')}")
+    print(f"📑 Nguồn trích xuất: {len(response3.get('sources', []))} chunks")
     print(f"⏱ Thời gian xử lý & sinh câu trả lời: {time.time() - start_q3:.2f}s")
+    
+    print("\n[🛠️ CHI TIẾT LOG HỆ THỐNG]")
+    for log in controller.get_system_logs():
+        print(log)
     print("-" * 50)
 
 if __name__ == "__main__":

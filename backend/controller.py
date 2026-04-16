@@ -2,29 +2,74 @@ import logging
 from langchain_community.llms import Ollama
 from backend.rag_pipeline import RagPipeline # Giữ nguyên đường dẫn import của bạn
 
+# =========================================================
+# BƯỚC 1: TẠO BỘ HỨNG LOG DÀNH CHO GIAO DIỆN
+# =========================================================
+class UILogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.log_queue = [] # Mảng lưu trữ log tạm thời
+
+    def emit(self, record):
+        # Bắt lấy từng dòng log, format nó và nhét vào mảng
+        log_entry = self.format(record)
+        self.log_queue.append(log_entry)
+
+    def pull_logs(self):
+        """Hàm này lấy log ra, đồng thời xóa log cũ đi để UI không bị in trùng lặp"""
+        logs = self.log_queue.copy()
+        self.log_queue.clear()
+        return logs
+
+# Khởi tạo bộ hứng và gắn nó vào Logger gốc (Root Logger) của toàn hệ thống
+ui_handler = UILogHandler()
+# Format log ngắn gọn, bỏ qua phần thời gian dài dòng để UI dễ nhìn
+ui_handler.setFormatter(logging.Formatter('👉 %(message)s')) 
+logging.getLogger().addHandler(ui_handler)
+
 logger = logging.getLogger(__name__)
 
 class RAGController:
-    def __init__(self):
+    def __init__(self, default_model="qwen2.5:7b"):
         try:
             # 1. Khởi tạo Service Layer (Pipeline)
             self.pipeline = RagPipeline()
+            self.llm = None
         
             # 2. Khởi tạo LLM
-            logger.info("Đang kết nối với Ollama Qwen2.5:7b...")
-            self.llm = Ollama(
-                model="qwen2.5:7b",
-                temperature=0.7,
-                top_p=0.9,
-                repeat_penalty=1.1
-            )
-            
-            # QUAN TRỌNG: Bơm LLM vào Pipeline để nó có thể chạy Conversational RAG (Câu 6)
-            self.pipeline.llm = self.llm
+            logger.info(f"Đang kết nối với Model: {default_model}...")
+            self.setup_llm(model_name=default_model)
 
         except Exception as e:
             logger.error(f"❌ Lỗi khởi tạo hệ thống RAGController: {str(e)}")
 
+    def setup_llm(self, model_name: str, temperature: float = 0.7):
+        """
+        Hàm chuyên trách việc khởi tạo hoặc thay đổi LLM (Swap Model).
+        Giúp linh hoạt đổi từ Qwen sang Llama, Phi... mà không load lại Pipeline.
+        """
+        logger.info(f"🔄 Đang kết nối/chuyển đổi sang model Ollama: {model_name}...")
+        try:
+            # Khởi tạo instance LLM mới
+            new_llm = Ollama(
+                model=model_name,
+                temperature=temperature,
+                top_p=0.9,
+                repeat_penalty=1.1
+            )
+            
+            # Cập nhật cho Controller
+            self.llm = new_llm
+            
+            # QUAN TRỌNG: Cập nhật (Inject) ngay lập tức vào Pipeline để các chuỗi RAG dùng model mới
+            self.pipeline.llm = self.llm
+            
+            logger.info(f"✅ Đã cấu hình thành công model: {model_name}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Lỗi khi thiết lập model {model_name}: {str(e)}")
+            return False
+        
     def process_new_document(self, documents):
         """Hàm này Role 1 sẽ gọi khi người dùng upload file PDF"""
         logger.info("Bắt đầu xử lý tài liệu mới...")
@@ -69,9 +114,25 @@ class RAGController:
             logger.error(f"❌ Lỗi không xác định khi truy vấn: {str(e)}", exc_info=True)
             return {"answer": f"⚠️ Lỗi xử lý câu hỏi. Chi tiết: {str(e)}", "sources": []}
 
-    def clear_all_data(self):
-        """Hàm API để Role 1 gọi khi bấm nút Xóa Database (Câu 3)"""
-        return self.pipeline.clear_database()
+    # =========================================================
+    # CÁC API HỖ TRỢ DỌN DẸP HỆ THỐNG (CÂU 3)
+    # =========================================================
+    
+    def clear_vector_store(self):
+        """
+        Hàm API để Role 1 gọi khi user bấm nút 'Xóa Database / Xóa Tài liệu'.
+        Hành động này ảnh hưởng đến toàn bộ hệ thống.
+        """
+        logger.info("Nhận API Request: Xóa toàn bộ Vector Database.")
+        return self.pipeline.clear_vector_store()
+        
+    def clear_chat_history(self, session_id="default_session"):
+        """
+        Hàm API để Role 1 gọi khi user bấm nút 'Xóa Lịch sử Chat / New Chat'.
+        Chỉ ảnh hưởng đến session của chính user đó.
+        """
+        logger.info(f"Nhận API Request: Xóa Lịch sử Chat cho session '{session_id}'.")
+        return self.pipeline.clear_session_history(session_id=session_id)
     
     # ĐÃ BỔ SUNG: API để chạy Performance Benchmark (Câu 7)
     def run_performance_benchmark(self, question):
@@ -88,3 +149,13 @@ class RAGController:
         Đáp ứng tiêu chí so sánh hiệu năng của Câu 9.
         """
         return self.pipeline.benchmark_reranker_vs_bi_encoder(question, filter_dict)
+    
+    # =========================================================
+    # API HỖ TRỢ GIAO DIỆN (UI) TRÍCH XUẤT LOG
+    # =========================================================
+    def get_system_logs(self) -> list[str]:
+        """
+        Role 1 (UI) gọi hàm này sau mỗi hành động (ví dụ sau khi user hỏi xong)
+        để lấy toàn bộ quá trình suy nghĩ của Backend in lên màn hình.
+        """
+        return ui_handler.pull_logs()
