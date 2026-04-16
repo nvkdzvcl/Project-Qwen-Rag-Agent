@@ -6,11 +6,15 @@ Tổ chức: cấu hình trang → state → CSS (styles.py) → sidebar → t�
 
 from __future__ import annotations
 
-import time
-from typing import Any, Dict, List
+import uuid
+from typing import Dict, List
 
+import pdfplumber
 import streamlit as st
+from langchain_core.documents import Document
 
+from backend.controller import RAGController
+from backend.splitter import SmartDocSplitter
 from frontend.constants import MAX_PDF_BYTES
 from frontend.styles import inject_global_styles
 
@@ -23,50 +27,84 @@ st.set_page_config(
 )
 
 
+# ---------------------------------------------------------------------------
+# STATE
+# ---------------------------------------------------------------------------
+
 def init_state() -> None:
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+
+    if "rag_controller" not in st.session_state:
+        with st.spinner("Đang khởi tạo hệ thống AI (lần đầu có thể mất vài phút)…"):
+            st.session_state.rag_controller = RAGController()
+
     if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []  # type: List[Dict[str, str]]
+        st.session_state.chat_history: List[Dict] = []
     if "vector_ready" not in st.session_state:
-        st.session_state.vector_ready = False
+        # Nếu pipeline đã khôi phục FAISS từ disk, đánh dấu sẵn sàng luôn
+        st.session_state.vector_ready = (
+            st.session_state.rag_controller.pipeline.vector_store is not None
+        )
     if "uploaded_filename" not in st.session_state:
         st.session_state.uploaded_filename = ""
-    if "last_answer" not in st.session_state:
-        st.session_state.last_answer = ""
-    if "last_citations" not in st.session_state:
-        st.session_state.last_citations = []  # type: List[Dict[str, str]]
     if "processing_done" not in st.session_state:
         st.session_state.processing_done = False
 
-
-def _demo_process_document() -> None:
-    progress_ph = st.empty()
-    status_ph = st.empty()
-    status_ph.info("Đang phân tích tài liệu và tạo vector store…")
-    bar = progress_ph.progress(0)
-    for i in range(0, 101, 12):
-        time.sleep(0.05)
-        bar.progress(min(i, 100))
-    st.session_state.vector_ready = True
-    st.session_state.processing_done = True
-    status_ph.success("Xử lý xong. Bạn có thể đặt câu hỏi về nội dung.")
+    # Giá trị mặc định cho slider (tránh KeyError khi parse_and_split chạy trước render)
+    if "cfg_chunk" not in st.session_state:
+        st.session_state.cfg_chunk = 1000
+    if "cfg_overlap" not in st.session_state:
+        st.session_state.cfg_overlap = 200
+    if "cfg_topk" not in st.session_state:
+        st.session_state.cfg_topk = 3
+    if "cfg_model" not in st.session_state:
+        st.session_state.cfg_model = "qwen2.5:7b"
 
 
-def _demo_answer(question: str) -> Dict[str, Any]:
-    short = question.strip()[:140] if question.strip() else "câu hỏi"
-    return {
-        "answer": (
-            f"[Demo] Trả lời mẫu cho: «{short}». "
-            "Khi kết nối backend RAG + Ollama, đây sẽ là câu trả lời thật từ PDF."
-        ),
-        "citations": [
-            {
-                "page": "1",
-                "location": "Đoạn trích",
-                "snippet": "Ví dụ trích dẫn — kết nối RAG để hiển thị trang và đoạn thật.",
-            },
-        ],
-    }
+# ---------------------------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------------------------
 
+def _parse_and_split(uploaded_file) -> List[Document]:
+    """Đọc PDF → list[Document] rồi split bằng SmartDocSplitter."""
+    raw_docs: List[Document] = []
+    with pdfplumber.open(uploaded_file) as pdf:
+        for i, page in enumerate(pdf.pages):
+            text = page.extract_text() or ""
+            if text.strip():
+                raw_docs.append(
+                    Document(
+                        page_content=text,
+                        metadata={"source": uploaded_file.name, "page": i},
+                    )
+                )
+
+    if not raw_docs:
+        return []
+
+    splitter = SmartDocSplitter(
+        chunk_size=st.session_state.cfg_chunk,
+        chunk_overlap=st.session_state.cfg_overlap,
+    )
+    return splitter.split_documents(raw_docs)
+
+
+def _sources_to_citations(sources: List[Dict]) -> List[Dict]:
+    """Map cấu trúc sources từ backend sang citations cho UI."""
+    return [
+        {
+            "page": s.get("page", "?"),
+            "location": s.get("file_name", ""),
+            "snippet": s.get("content_snippet", ""),
+        }
+        for s in sources
+    ]
+
+
+# ---------------------------------------------------------------------------
+# SIDEBAR
+# ---------------------------------------------------------------------------
 
 def render_sidebar() -> None:
     with st.sidebar:
@@ -74,18 +112,32 @@ def render_sidebar() -> None:
         st.caption("Hỏi đáp tài liệu thông minh (RAG + Qwen)")
 
         st.markdown("### Hướng dẫn")
-        st.markdown("1. Tải lên PDF (tối đa 50MB)")
+        st.markdown("1. Tải lên PDF (tối đa 50 MB)")
         st.markdown("2. Bấm **Phân tích tài liệu**")
         st.markdown("3. Đặt câu hỏi và xem trích dẫn")
 
         st.markdown("### Cấu hình")
-        st.selectbox("Mô hình LLM", ["Qwen2.5:7b", "Qwen2.5:14b"], index=0)
-        st.slider("Chunk size", min_value=500, max_value=3000, value=500, step=100, key="cfg_chunk")
-        st.slider("Chunk overlap", min_value=50, max_value=300, value=50, step=10, key="cfg_overlap")
-        st.slider("Top-k", min_value=1, max_value=10, value=3, step=1, key="cfg_topk")
+        model_choice = st.selectbox(
+            "Mô hình LLM",
+            ["qwen2.5:7b", "qwen2.5:14b"],
+            index=0,
+            key="cfg_model_select",
+        )
+        # Swap model nếu người dùng đổi
+        if model_choice != st.session_state.cfg_model:
+            st.session_state.cfg_model = model_choice
+            st.session_state.rag_controller.setup_llm(model_name=model_choice)
+            st.success(f"Đã chuyển sang {model_choice}")
+
+        st.slider("Chunk size", min_value=500, max_value=3000, value=st.session_state.cfg_chunk,
+                  step=100, key="cfg_chunk")
+        st.slider("Chunk overlap", min_value=50, max_value=300, value=st.session_state.cfg_overlap,
+                  step=10, key="cfg_overlap")
+        st.slider("Top-k", min_value=1, max_value=10, value=st.session_state.cfg_topk,
+                  step=1, key="cfg_topk")
 
         st.markdown("### Lịch sử (gần đây)")
-        hist: List[Dict[str, str]] = st.session_state.chat_history
+        hist = st.session_state.chat_history
         if not hist:
             st.caption("Chưa có hội thoại.")
         else:
@@ -93,18 +145,27 @@ def render_sidebar() -> None:
                 q = item.get("question", "")[:56]
                 st.markdown(f"**{i}.** {q}…")
 
-        if st.button("Xóa lịch sử", use_container_width=True):
+        if st.button("Xóa lịch sử chat", use_container_width=True):
             st.session_state.chat_history = []
-            st.session_state.last_answer = ""
-            st.session_state.last_citations = []
+            st.session_state.rag_controller.clear_chat_history(
+                session_id=st.session_state.session_id
+            )
             st.success("Đã xóa lịch sử.")
 
         if st.button("Xóa vector / tài liệu", use_container_width=True):
+            ok, msg = st.session_state.rag_controller.clear_vector_store()
             st.session_state.vector_ready = False
             st.session_state.processing_done = False
             st.session_state.uploaded_filename = ""
-            st.warning("Đã xóa trạng thái tài liệu (demo).")
+            if ok:
+                st.warning("Đã xóa toàn bộ dữ liệu tài liệu.")
+            else:
+                st.error(msg)
 
+
+# ---------------------------------------------------------------------------
+# HEADER & WORKFLOW
+# ---------------------------------------------------------------------------
 
 def render_page_header() -> None:
     st.markdown(
@@ -123,25 +184,13 @@ def render_workflow_strip() -> None:
         """
         <div class="feature-section">
             <div class="workflow-flow">
-                <div class="workflow-step">
-                    <h4>Tải tài liệu</h4>
-                    <p>nhiều loại file, tối đa 50MB</p>
-                </div>
+                <div class="workflow-step"><h4>Tải tài liệu</h4><p>PDF tối đa 50 MB</p></div>
                 <div class="workflow-step-arrow">→</div>
-                <div class="workflow-step">
-                    <h4>Phân tích</h4>
-                    <p>Vector hóa nội dung</p>
-                </div>
+                <div class="workflow-step"><h4>Phân tích</h4><p>Vector hóa nội dung</p></div>
                 <div class="workflow-step-arrow">→</div>
-                <div class="workflow-step">
-                    <h4>Truy vấn</h4>
-                    <p>Đặt câu hỏi</p>
-                </div>
+                <div class="workflow-step"><h4>Truy vấn</h4><p>Đặt câu hỏi</p></div>
                 <div class="workflow-step-arrow">→</div>
-                <div class="workflow-step">
-                    <h4>Trích dẫn</h4>
-                    <p>Nguồn trong PDF</p>
-                </div>
+                <div class="workflow-step"><h4>Trích dẫn</h4><p>Nguồn trong PDF</p></div>
             </div>
         </div>
         """,
@@ -149,23 +198,25 @@ def render_workflow_strip() -> None:
     )
 
 
-def render_upload_section() -> None:
-   
+# ---------------------------------------------------------------------------
+# UPLOAD
+# ---------------------------------------------------------------------------
 
+def render_upload_section() -> None:
     with st.container():
         st.markdown(
             """
             <div class="upload-banner">
                 <div class="upload-banner-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2.2"
+                         stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="19" x2="12" y2="5"/>
                         <polyline points="5 12 12 5 19 12"/>
                     </svg>
                 </div>
                 <div class="upload-banner-title">Tải lên tài liệu</div>
-                <div class="upload-banner-desc">
-                     <b></b> Sau khi tải, bấm nút phân tích để chuẩn bị hỏi đáp.
-                </div>
+                <div class="upload-banner-desc">Sau khi tải, bấm nút phân tích để chuẩn bị hỏi đáp.</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -187,72 +238,106 @@ def render_upload_section() -> None:
             return
 
         size = getattr(uploaded_file, "size", None) or 0
-        if size and size > MAX_PDF_BYTES:
+        if size > MAX_PDF_BYTES:
             st.error(f"File vượt quá {MAX_PDF_BYTES // (1024 * 1024)} MB. Chọn file nhỏ hơn.")
             return
 
         st.session_state.uploaded_filename = uploaded_file.name
         st.success(f"Đã chọn: **{uploaded_file.name}**")
 
-        if not st.session_state.vector_ready:
-            if st.button(
-                "Bắt đầu phân tích tài liệu",
-                type="secondary",
-                use_container_width=True,
-                key="btn_process_doc",
-            ):
-                _demo_process_document()
-        else:
+        if st.session_state.vector_ready:
             st.success(f"Sẵn sàng hỏi đáp: {uploaded_file.name}")
+            return
+
+        if st.button("Bắt đầu phân tích tài liệu", type="secondary",
+                     use_container_width=True, key="btn_process_doc"):
+            with st.spinner("Đang đọc và vector hóa tài liệu…"):
+                chunks = _parse_and_split(uploaded_file)
+                if not chunks:
+                    st.error("Không đọc được nội dung từ file PDF. Vui lòng thử file khác.")
+                    return
+                ok, msg = st.session_state.rag_controller.process_new_document(chunks)
+
+            if ok:
+                st.session_state.vector_ready = True
+                st.session_state.processing_done = True
+                st.success(f"Xử lý xong {len(chunks)} chunks. Bạn có thể đặt câu hỏi!")
+            else:
+                st.error(msg)
 
 
-def render_query_section() -> None:
-    st.markdown('<p class="section-title">Câu hỏi</p>', unsafe_allow_html=True)
-    question = st.text_input(
-        "Nội dung câu hỏi",
-        placeholder="Ví dụ: Tóm tắt mục tiêu chính của tài liệu?",
-        label_visibility="collapsed",
-        key="user_question",
-    )
-    can_ask = st.session_state.vector_ready and bool(question and question.strip())
-    if st.button("Gửi câu hỏi", type="primary", disabled=not can_ask, use_container_width=False):
-        with st.spinner("Đang suy luận…"):
-            time.sleep(0.35)
-            out = _demo_answer(question)
-            st.session_state.last_answer = str(out["answer"])
-            st.session_state.last_citations = list(out["citations"])
-            st.session_state.chat_history.append(
-                {"question": question.strip(), "answer": st.session_state.last_answer}
-            )
-        st.success("Đã nhận phản hồi.")
+# ---------------------------------------------------------------------------
+# CHAT
+# ---------------------------------------------------------------------------
 
-    if not st.session_state.vector_ready:
-        st.caption("Cần phân tích tài liệu trước khi gửi câu hỏi.")
+def render_chat_section() -> None:
+    st.markdown('<p class="section-title">💬 Hỏi đáp tài liệu</p>', unsafe_allow_html=True)
 
-
-def render_response_section() -> None:
-    st.markdown('<p class="section-title">Câu trả lời</p>', unsafe_allow_html=True)
-    if st.session_state.last_answer:
-        st.write(st.session_state.last_answer)
-    else:
-        st.info("Câu trả lời sẽ hiển thị tại đây.")
-
-    st.markdown('<p class="section-title">Trích dẫn</p>', unsafe_allow_html=True)
-    cites: List[Dict[str, str]] = st.session_state.last_citations
-    if cites:
-        for c in cites:
+    # Hiển thị lịch sử hội thoại
+    chat_container = st.container(height=500)
+    with chat_container:
+        if not st.session_state.chat_history:
             st.markdown(
-                f"""
-                <div class="citation-item">
-                    <strong>Trang {c.get("page", "?")}</strong> — {c.get("location", "")}<br/>
-                    <span>{c.get("snippet", "")}</span>
-                </div>
-                """,
+                '<div class="answer-empty">Lịch sử hội thoại sẽ hiển thị tại đây.</div>',
                 unsafe_allow_html=True,
             )
-    else:
-        st.caption("Chưa có trích dẫn. Gửi câu hỏi sau khi đã phân tích tài liệu.")
+        for msg in st.session_state.chat_history:
+            with st.chat_message("user"):
+                st.write(msg["question"])
+            with st.chat_message("assistant", avatar="🤖"):
+                st.write(msg["answer"])
+                cites = msg.get("citations", [])
+                if cites:
+                    with st.expander(f"📎 {len(cites)} trích dẫn nguồn"):
+                        citations_html = '<div class="citations-wrap">'
+                        for i, c in enumerate(cites, start=1):
+                            citations_html += f"""
+                            <div class="citation-card">
+                                <div class="citation-top">
+                                    <span class="cite-index">{i}</span>
+                                    <span class="cite-page">Trang {c.get('page', '?')}</span>
+                                    <span class="cite-location">{c.get('location', '')}</span>
+                                </div>
+                                <blockquote class="cite-snippet">"{c.get('snippet', '')}"</blockquote>
+                            </div>"""
+                        citations_html += "</div>"
+                        st.markdown(citations_html, unsafe_allow_html=True)
 
+    # Form nhập câu hỏi
+    if not st.session_state.vector_ready:
+        st.markdown(
+            '<p class="qa-hint">⚠️ Cần phân tích tài liệu trước khi đặt câu hỏi.</p>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    with st.form(key="query_form", clear_on_submit=True):
+        question = st.text_input(
+            "Câu hỏi",
+            placeholder="Ví dụ: Tóm tắt mục tiêu chính của tài liệu?",
+            label_visibility="collapsed",
+        )
+        submitted = st.form_submit_button("🔍 Gửi câu hỏi", type="primary")
+
+        if submitted and question.strip():
+            with st.spinner("Đang suy luận…"):
+                result = st.session_state.rag_controller.answer_question(
+                    question=question.strip(),
+                    session_id=st.session_state.session_id,
+                )
+            answer = result.get("answer", "")
+            citations = _sources_to_citations(result.get("sources", []))
+            st.session_state.chat_history.append({
+                "question": question.strip(),
+                "answer": answer,
+                "citations": citations,
+            })
+            st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------------------------
 
 def main() -> None:
     init_state()
@@ -261,5 +346,4 @@ def main() -> None:
     render_page_header()
     render_workflow_strip()
     render_upload_section()
-    render_query_section()
-    render_response_section()
+    render_chat_section()

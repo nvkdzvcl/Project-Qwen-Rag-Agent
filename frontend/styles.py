@@ -127,7 +127,6 @@ def inject_global_styles() -> None:
 
             .main-header {
                 text-align: center;
-                margin-top: 1rem;
                 color: var(--primary);
                 margin-bottom: 1rem;
                 border-bottom: 1px solid #e3e6ea;
