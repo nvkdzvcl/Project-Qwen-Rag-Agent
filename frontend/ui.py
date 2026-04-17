@@ -18,6 +18,13 @@ from backend.splitter import SmartDocSplitter
 from frontend.constants import MAX_PDF_BYTES
 from frontend.styles import inject_global_styles
 
+# Local Ollama tags and their user-facing labels.
+MODEL_LABELS = {
+    "qwen2.5:7b": "qwen2.5:7b (Q4_K_M - khuyen nghi)",
+    "qwen2.5:14b": "qwen2.5:14b (chat luong cao hon, ton RAM)",
+}
+MODEL_OPTIONS = list(MODEL_LABELS.keys())
+
 # --- Cấu hình trang (gọi một lần khi import) ---
 st.set_page_config(
     page_title="SmartDoc AI",
@@ -119,10 +126,14 @@ def render_sidebar() -> None:
         st.markdown("3. Đặt câu hỏi và xem trích dẫn")
 
         st.markdown("### Cấu hình")
+        if st.session_state.cfg_model not in MODEL_OPTIONS:
+            st.session_state.cfg_model = MODEL_OPTIONS[0]
+
         model_choice = st.selectbox(
             "Mô hình LLM",
-            ["qwen2.5:7b", "qwen2.5:14b"],
-            index=0,
+            MODEL_OPTIONS,
+            index=MODEL_OPTIONS.index(st.session_state.cfg_model),
+            format_func=lambda model_tag: MODEL_LABELS.get(model_tag, model_tag),
             key="cfg_model_select",
         )
         # Swap model nếu người dùng đổi
