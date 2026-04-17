@@ -41,8 +41,11 @@ class RagPipeline:
             self.llm = None
 
             self.backend_session_memory = {}
-            # ĐÃ BỔ SUNG: Khai báo đường dẫn file lưu lịch sử chat
-            self.history_file = os.path.join(self.persist_directory, "chat_history.json")
+            # =========================================================
+            # ĐÃ SỬA LỖI (CÂU 3): Tách biệt hoàn toàn Data Storage và Memory Storage
+            # =========================================================
+            self.memory_directory = "./session_memory" # Thư mục độc lập dành riêng cho Lịch sử chat
+            self.history_file = os.path.join(self.memory_directory, "chat_history.json")
 
             self.all_documents = []
             logger.info("Tải Model thành công!")
@@ -208,20 +211,31 @@ class RagPipeline:
             base_search_kwargs = {"k": base_k}
 
             # 2. KIỂM TRA VÀ ÁP DỤNG BỘ LỌC (Metadata Filtering - Câu 8)
-            # Ví dụ filter_dict nhận vào từ Frontend: {'source': 'file_A.pdf'}
+            # Ví dụ filter_dict nhận vào từ Frontend: {'source': 'chuong1.pdf'}
             if filter_dict:
+                # =========================================================
+                # ĐÃ SỬA LỖI (CÂU 8): Chuẩn hóa đồng nhất metadata cho toàn luồng
+                # =========================================================
+                normalized_filter = {}
+                for k, v in filter_dict.items():
+                    # Ánh xạ thông minh từ 'source' sang 'file_name' nếu giá trị chỉ là tên tệp (không chứa / hoặc \)
+                    if k == 'source' and isinstance(v, str) and '/' not in v and '\\' not in v:
+                        normalized_filter['file_name'] = v
+                    else:
+                        normalized_filter[k] = v
+                
+                # Cập nhật lại filter_dict bằng phiên bản đã chuẩn hóa
+                filter_dict = normalized_filter
                 base_search_kwargs["filter"] = filter_dict
-                logger.info(f"🗂️ Đã áp dụng bộ lọc Metadata: {filter_dict}")
+                logger.info(f"🗂️ Đã chuẩn hóa và áp dụng bộ lọc Metadata: {filter_dict}")
 
             # 3. XÂY DỰNG BASE RETRIEVER (Cỗ máy lưới cào)
             base_retriever = None
             if search_type.lower() == "hybrid":
                 # Chế độ tìm kiếm lai (Câu 7)
-                # Áp dụng bộ lọc (base_search_kwargs) vào luồng FAISS (FAISS xử lý filter rất an toàn)
                 faiss_retriever = self.vector_store.as_retriever(search_kwargs=base_search_kwargs)
 
-                # BM25 có thể bị mất trạng thái khi reload/clear một phần.
-                # Thử tự dựng lại; nếu vẫn không được thì fallback về pure vector để không làm hỏng trải nghiệm hỏi đáp.
+                # Kiểm tra trạng thái BM25
                 bm25_ready = self._ensure_bm25_retriever()
                 if not bm25_ready:
                     logger.warning(
@@ -230,7 +244,7 @@ class RagPipeline:
                     )
                     base_retriever = faiss_retriever
                 
-                # ĐÃ SỬA LỖI 2: Xử lý logic lọc BM25 cực kỳ nghiêm ngặt (Strict Filtering)
+                # Logic lọc cho BM25 (Strict Filtering)
                 if base_retriever is None and filter_dict:
                     logger.info("🗂️ Đang ép BM25 chỉ tìm kiếm trong vùng Metadata được cấp phép...")
                     
@@ -238,12 +252,8 @@ class RagPipeline:
                     for doc in self.all_documents:
                         is_match = True
                         for k, v in filter_dict.items():
-                            # SỰ THÔNG MINH: Nếu Frontend truyền key là 'source' nhưng value lại chỉ là tên file
-                            # Hệ thống sẽ tự động map sang kiểm tra với 'file_name' để không bị trượt
-                            if k == 'source' and '/' not in v and '\\' not in v:
-                                actual_val = doc.metadata.get('file_name', '')
-                            else:
-                                actual_val = doc.metadata.get(k)
+                            # Logic lọc trở nên tối giản và an toàn do bộ lọc đã được chuẩn hóa ở bước 2
+                            actual_val = doc.metadata.get(k)
                             
                             if actual_val != v:
                                 is_match = False
@@ -252,21 +262,19 @@ class RagPipeline:
                         if is_match:
                             filtered_docs.append(doc)
 
-                    # BỊT LỖ HỔNG RÒ RỈ: Không dùng mẹo gán doc[0] nữa
+                    # Bịt lỗ hổng rò rỉ: Trả về FAISS thuần nếu không có tài liệu BM25 nào khớp
                     if not filtered_docs:
-                        logger.warning("⚠️ CẢNH BÁO STRICT FILTER: Không có tài liệu nào khớp với Metadata filter. Tắt BM25 để tránh rò rỉ dữ liệu.")
-                        # Nếu BM25 không có tài liệu, ta chỉ dùng một mình FAISS (Vector Search)
-                        # FAISS mặc định xử lý filter rỗng rất tốt (nó trả về [])
+                        logger.warning("⚠️ CẢNH BÁO STRICT FILTER: Không có tài liệu BM25 khớp. Fallback sang FAISS.")
                         base_retriever = faiss_retriever
                     else:
-                        # Nếu có tài liệu khớp, cấu hình BM25 như bình thường
                         bm25_to_use = BM25Retriever.from_documents(filtered_docs)
                         bm25_to_use.k = base_search_kwargs.get("k", base_k)
                         base_retriever = EnsembleRetriever(
                             retrievers=[bm25_to_use, faiss_retriever],
                             weights=[0.3, 0.7]
                         )
-                        logger.info(f"✅ Khởi tạo Ensemble Retriever thành công (Đã lọc chuẩn xác {len(filtered_docs)} chunks cho BM25).")
+                        logger.info(f"✅ Khởi tạo Ensemble Retriever thành công (Đã lọc {len(filtered_docs)} chunks cho BM25).")
+                        
                 elif base_retriever is None:
                     base_retriever = EnsembleRetriever(
                         retrievers=[self.bm25_retriever, faiss_retriever],
@@ -739,7 +747,7 @@ class RagPipeline:
         """
         try:
             # Đảm bảo thư mục lưu trữ tồn tại
-            os.makedirs(self.persist_directory, exist_ok=True)
+            os.makedirs(self.memory_directory, exist_ok=True)
             
             raw_memory = {}
             for session_id, messages in self.backend_session_memory.items():
@@ -756,8 +764,8 @@ class RagPipeline:
     def _extract_metadata(self, source_docs: list) -> list[dict]:
         """
         Hàm Helper: Bóc tách siêu dữ liệu (metadata) từ các chunks do FAISS trả về.
-        - Giữ lại TẤT CẢ các chunks (ngay cả trên cùng 1 trang) để Frontend highlight đầy đủ.
-        - Cung cấp exact_match_text để Frontend tìm và bôi vàng (highlight) trên PDF.
+        - Giữ lại TẤT CẢ các chunks (ngay cả trên cùng 1 trang) để Frontend highlight.
+        - ĐÃ CẬP NHẬT CÂU 5: Xây dựng cấu trúc vị trí (Position Tracking) chuẩn xác.
         """
         sources = []
         seen_chunks = set()
@@ -770,33 +778,45 @@ class RagPipeline:
             raw_source = doc.metadata.get("source", "Tài liệu không tên")
             file_name = raw_source.split("/")[-1].split("\\")[-1] 
 
-            # ĐÃ SỬA: Tạo ID duy nhất dựa trên NỘI DUNG CHUNK thay vì số trang.
-            # Nhờ vậy, 2 đoạn văn khác nhau trên cùng 1 trang đều được giữ lại.
+            # Tạo ID duy nhất dựa trên NỘI DUNG CHUNK
             chunk_hash = hash(doc.page_content)
             unique_identifier = f"{file_name}_page_{display_page}_chunk_{chunk_hash}"
             
             if unique_identifier not in seen_chunks:
                 seen_chunks.add(unique_identifier)
                 
+                # =========================================================
+                # ĐÃ SỬA CÂU 5: Định nghĩa Schema Vị trí (Position Schema) nghiêm ngặt
+                # Đóng gói các tọa độ/offset thành một block độc lập để UI dễ xử lý
+                # =========================================================
+                position_data = {
+                    "bbox": doc.metadata.get("bbox", None),               # Tọa độ bounding box [x0, y0, x1, y1]
+                    "char_start": doc.metadata.get("start_index", None),  # Offset ký tự bắt đầu
+                    "char_end": doc.metadata.get("end_index", None),      # Offset ký tự kết thúc
+                }
+
+                # Log cảnh báo ở mức độ debug nếu chunk thiếu dữ liệu vị trí gốc
+                if not any(position_data.values()):
+                    logger.debug(f"⚠️ Chunk {idx} hiện chưa có dữ liệu vị trí (bbox/offset) từ Document Loader.")
+
                 # Đóng gói dữ liệu chuẩn bị cho Frontend
                 source_info = {
-                    "chunk_id": idx,  # Gắn ID để Frontend dễ map dữ liệu
+                    "chunk_id": idx,
                     "file_name": file_name,
                     "page": display_page,
                     "content_snippet": doc.page_content[:150] + "...",
                     
-                    # ĐÃ SỬA: Cung cấp text nguyên bản chính xác 100% để Frontend 
-                    # dùng hàm Javascript search và highlight (bôi vàng) trên file PDF.
                     "exact_match_text": doc.page_content, 
                     "full_context": doc.page_content,
                     
-                    # Chuyển tiếp toàn bộ metadata gốc (Nếu Role 2 có truyền tọa độ bbox, 
-                    # offset ký tự... thì Frontend sẽ nhận được hết ở đây)
+                    # Cung cấp object vị trí tường minh cho Frontend (Role 1)
+                    "pdf_position": position_data, 
+                    
                     "raw_metadata": doc.metadata 
                 }
                 sources.append(source_info)
                 
-        logger.info(f"📑 Đã trích xuất {len(sources)} đoạn tài liệu (chunks) độc lập để hỗ trợ Frontend Highlight.")
+        logger.info(f"📑 Đã trích xuất {len(sources)} nguồn với định dạng Position Tracking (Bounding Box/Offset) tiêu chuẩn.")
         return sources
     
     def _get_dynamic_prompt(self, user_input: str):
