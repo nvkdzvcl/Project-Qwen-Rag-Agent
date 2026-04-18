@@ -572,7 +572,12 @@ class RagPipeline:
             try:
                 pairs = [[question, doc.page_content] for doc in source_documents[:3]]
                 raw_scores = self.cross_encoder_model.score(pairs)
-                if raw_scores:
+                
+                # =========================================================
+                # ĐÃ SỬA LỖI: Sửa cách kiểm tra điều kiện mảng của Numpy
+                # Không dùng `if raw_scores:` nữa để tránh lỗi Ambiguous Truth Value
+                # =========================================================
+                if raw_scores is not None and len(raw_scores) > 0:
                     relevance_score = sum(
                         max(0.0, min(1.0, float(score))) for score in raw_scores
                     ) / len(raw_scores)

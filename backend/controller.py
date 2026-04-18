@@ -1,4 +1,6 @@
 import logging
+import gc
+import time
 from langchain_community.llms import Ollama
 from backend.rag_pipeline import RagPipeline # Giữ nguyên đường dẫn import của bạn
 
@@ -55,7 +57,8 @@ class RAGController:
                 model=model_name,
                 temperature=temperature,
                 top_p=0.9,
-                repeat_penalty=1.1
+                repeat_penalty=1.1,
+                num_ctx = 3072
             )
             
             # Cập nhật cho Controller
@@ -70,15 +73,24 @@ class RAGController:
             logger.error(f"❌ Lỗi khi thiết lập model {model_name}: {str(e)}")
             return False
         
-    def process_new_document(self, documents):
-        """Hàm này Role 1 sẽ gọi khi người dùng upload file PDF"""
-        logger.info("Bắt đầu xử lý tài liệu mới...")
+    # ĐÃ SỬA LỖI: Thêm cờ clear_old=False để chống rò rỉ ngữ cảnh giữa các file
+    def process_new_document(self, documents, clear_old=False):
+        """
+        Hàm này Role 1 sẽ gọi khi người dùng upload file PDF.
+        Tham số clear_old=True cho phép ghi đè/xóa file cũ trước khi nạp file mới,
+        giúp giải quyết triệt để lỗi "Retrieval Scope Leak".
+        """
+        logger.info(f"Bắt đầu xử lý tài liệu mới... (Chế độ xóa file cũ: {clear_old})")
         try:
+            # Nếu giao diện truyền lệnh xóa tài liệu cũ, ta dọn sạch DB trước khi thêm
+            if clear_old:
+                logger.info("🧹 Đang dọn dẹp Database cũ để chuẩn bị nạp tài liệu độc lập...")
+                self.clear_vector_store()
+                
             # 1. Nạp dữ liệu vào FAISS (Vector Database)
             self.pipeline.create_database(documents)
             
             # 2. Nạp dữ liệu vào BM25 (Từ khóa) cho Hybrid Search (Câu 7)
-            # Nếu thiếu dòng này, hàm get_retriever("hybrid") sẽ báo lỗi
             self.pipeline.build_hybrid_database(documents)
             
             logger.info("Hệ thống RAG đã sẵn sàng nhận câu hỏi!")
@@ -123,6 +135,66 @@ class RAGController:
             logger.error(f"❌ Lỗi kết nối LLM: {str(ce)}")
             return {"answer": "⚠️ Lỗi: Không thể kết nối với Ollama. Vui lòng bật phần mềm Ollama!", "sources": []}
             
+        except Exception as e:
+            logger.error(f"❌ Lỗi không xác định khi truy vấn: {str(e)}", exc_info=True)
+            return {"answer": f"⚠️ Lỗi xử lý câu hỏi. Chi tiết: {str(e)}", "sources": []}
+        
+    def answer_question_compare(self, question, session_id="compare_session", filter_dict=None):
+        """
+        Chạy so sánh song song giữa Standard RAG (Tốc độ) và Advanced RAG/Self-RAG (Chính xác).
+        Hàm này trả về kết quả của cả 2 để UI vẽ thành 2 cột đối chiếu.
+        """
+        logger.info(f"⚖️ Bắt đầu chế độ COMPARE (So sánh 2 luồng RAG) cho câu hỏi: '{question}'")
+        
+        try:
+            if not self.pipeline.vector_store:
+                return {"answer": "Lỗi: Vui lòng upload tài liệu trước khi đặt câu hỏi!", "sources": []}
+            
+            logger.info(
+                f"Query: '{question}' | Filter: '{filter_dict}'"
+            )
+
+            # -------------------------------------------------
+            # LUỒNG 1: CHẠY RAG TIÊU CHUẨN (TỐC ĐỘ)
+            # -------------------------------------------------
+            logger.info("▶️ [COMPARE] Bắt đầu chạy luồng RAG Tiêu chuẩn...")
+            start_standard = time.time()
+            
+            res_standard = self.pipeline.ask_question(
+                question, session_id=f"{session_id}_std", filter_dict=filter_dict
+            )
+            
+            res_standard['processing_time'] = round(time.time() - start_standard, 2)
+            
+            # -------------------------------------------------
+            # XẢ RÁC RAM (CỨU CÁNH CHO MÁY 16GB)
+            # -------------------------------------------------
+            logger.info("🧹 Đang xả rác RAM/VRAM đệm để nhường tài nguyên cho luồng Advanced...")
+            gc.collect()
+            
+            # -------------------------------------------------
+            # LUỒNG 2: CHẠY ADVANCED RAG / SELF-RAG (CHẤT LƯỢNG)
+            # -------------------------------------------------
+            logger.info("▶️ [COMPARE] Bắt đầu chạy luồng Advanced RAG (Self-RAG)...")
+            start_advanced = time.time()
+            
+            res_advanced = self.pipeline.ask_question_advanced(
+                question, session_id=f"{session_id}_adv", filter_dict=filter_dict
+            )
+            
+            res_advanced['processing_time'] = round(time.time() - start_advanced, 2)
+            
+            logger.info("🎉 Đã hoàn tất chế độ COMPARE!")
+            
+            # Trả về cục Data tổng để Frontend hiển thị
+            return {
+                "standard_rag": res_standard,
+                "advanced_rag": res_advanced
+            }
+            
+        except ConnectionError as ce:
+            logger.error(f"❌ Lỗi kết nối LLM: {str(ce)}")
+            return {"answer": "⚠️ Lỗi: Không thể kết nối với Ollama. Vui lòng bật phần mềm Ollama!", "sources": []}
         except Exception as e:
             logger.error(f"❌ Lỗi không xác định khi truy vấn: {str(e)}", exc_info=True)
             return {"answer": f"⚠️ Lỗi xử lý câu hỏi. Chi tiết: {str(e)}", "sources": []}
