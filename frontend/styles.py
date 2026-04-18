@@ -75,9 +75,10 @@ def inject_global_styles() -> None:
                 color: var(--text-light) !important;
             }
 
+            /* Selectbox model — highlight nền xanh primary */
             [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] {
-                background-color: #ffffff !important;
-                border: 1px solid #ced4da !important;
+                background-color: #e8f4ff !important;
+                border: 2px solid var(--primary) !important;
                 border-radius: 8px !important;
             }
 
@@ -106,9 +107,59 @@ def inject_global_styles() -> None:
                 color: var(--text-light) !important;
             }
 
+            .chat-highlight {
+                border-left: 3px solid var(--primary);
+                background: #f0f7ff;
+                border-radius: 8px;
+                padding: 4px 8px;
+                margin: 4px 0;
+            }
+
+            /* Sidebar history buttons */
             [data-testid="stSidebar"] .stButton > button {
                 border: 1px solid rgba(255, 255, 255, 0.25);
                 color: var(--text-light) !important;
+                text-align: left !important;
+                font-size: 0.82rem !important;
+                padding: 4px 8px !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* Checkbox trong sidebar — label trắng, box sáng */
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] label,
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] span,
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] p,
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] div,
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] label > div,
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] label > div > p {
+                color: #ffffff !important;
+                opacity: 1 !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] label span {
+                color: #ffffff !important;
+                opacity: 1 !important;
+            }
+
+            /* Ô vuông checkbox */
+            [data-testid="stSidebar"] [data-testid="stCheckbox"] input[type="checkbox"] {
+                accent-color: var(--primary) !important;
+                width: 16px !important;
+                height: 16px !important;
+            }
+
+            /* BaseWeb checkbox (Streamlit dùng baseweb) */
+            [data-testid="stSidebar"] [data-baseweb="checkbox"] span {
+                background-color: #ffffff !important;
+                border-color: #aaaaaa !important;
+            }
+
+            [data-testid="stSidebar"] [data-baseweb="checkbox"] [data-checked="true"] span,
+            [data-testid="stSidebar"] [data-baseweb="checkbox"] span[aria-checked="true"] {
+                background-color: var(--primary) !important;
+                border-color: var(--primary) !important;
             }
 
             [data-testid="stSidebar"] .stAlert {
@@ -128,6 +179,7 @@ def inject_global_styles() -> None:
             .main-header {
                 text-align: center;
                 color: var(--primary);
+                margin-top:3rem;
                 margin-bottom: 1rem;
                 border-bottom: 1px solid #e3e6ea;
                 padding-bottom: 0.75rem;
@@ -288,6 +340,31 @@ def inject_global_styles() -> None:
                 font-size: 0.95rem;
             }
 
+            /* Number input trong sidebar */
+            [data-testid="stSidebar"] [data-testid="stNumberInput"] label {
+                color: var(--text-light) !important;
+                font-size: 0.85rem !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stNumberInput"] input {
+                background-color: #ffffff !important;
+                color: var(--text-main) !important;
+                border: 1px solid #ced4da !important;
+                border-radius: 6px !important;
+                text-align: center !important;
+                font-weight: 600 !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stNumberInput"] button {
+                background-color: #3a3f44 !important;
+                color: var(--text-light) !important;
+                border: 1px solid rgba(255,255,255,0.2) !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover {
+                background-color: var(--primary) !important;
+            }
+
             .stButton > button[kind="primary"] {
                 background-color: var(--primary) !important;
                 border-color: var(--primary) !important;
@@ -299,6 +376,63 @@ def inject_global_styles() -> None:
                 border-color: var(--secondary) !important;
                 color: #1f2d3d !important;
                 font-weight: 600 !important;
+            }
+
+            /* Modal confirm overlay */
+            .modal-overlay {
+                background: rgba(0,0,0,0.18);
+                border-radius: 14px;
+                padding: 1.5rem 1.25rem 0.5rem;
+                margin-bottom: 0.5rem;
+                border: 1px solid #e0e0e0;
+            }
+
+            .modal-box {
+                background: #fff;
+                border-radius: 10px;
+                padding: 1rem 1.25rem;
+                box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+            }
+
+            .modal-title {
+                font-size: 1rem;
+                font-weight: 600;
+                color: #333;
+                margin-bottom: 0.4rem;
+            }
+
+            .modal-body {
+                font-size: 0.88rem;
+                color: #666;
+            }
+
+            /* Dialog popup — màu nhạt, nền trắng */
+            [data-testid="stDialog"] > div {
+                background: #ffffff !important;
+                border-radius: 16px !important;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important;
+            }
+
+            [data-testid="stDialog"] h2 {
+                color: #444 !important;
+                font-size: 1.05rem !important;
+                font-weight: 600 !important;
+            }
+
+            [data-testid="stDialog"] p {
+                color: #666 !important;
+            }
+
+            [data-testid="stDialog"] .stButton > button[kind="primary"] {
+                background-color: #e05555 !important;
+                border-color: #e05555 !important;
+                color: #fff !important;
+            }
+
+            [data-testid="stDialog"] .stButton > button[kind="secondary"] {
+                background-color: #f0f0f0 !important;
+                border-color: #ddd !important;
+                color: #555 !important;
             }
 
             .section-title {
