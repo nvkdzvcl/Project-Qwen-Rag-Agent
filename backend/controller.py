@@ -58,7 +58,7 @@ class RAGController:
                 temperature=temperature,
                 top_p=0.9,
                 repeat_penalty=1.1,
-                num_ctx = 3072
+                num_ctx = 2048
             )
             
             # Cập nhật cho Controller

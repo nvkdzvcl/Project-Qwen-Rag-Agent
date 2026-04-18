@@ -4,6 +4,7 @@ import os
 import time
 import datetime
 import json
+import gc
 from langchain_core.messages import HumanMessage, AIMessage, messages_from_dict, messages_to_dict
 from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
@@ -108,7 +109,7 @@ class RagPipeline:
             try:
                 self.cross_encoder_model = HuggingFaceCrossEncoder(
                     model_name="BAAI/bge-reranker-v2-m3",
-                    model_kwargs={"torch_dtype": "float16"}
+                    model_kwargs={"torch_dtype": "float16", "device": "cpu"}
                 )
                 logger.info("✅ Tải Reranker thành công (float16).")
             except TypeError as te:
@@ -124,6 +125,9 @@ class RagPipeline:
         except Exception as e:
             logger.error(f"❌ Lỗi khi tải mô hình Reranker: {str(e)}", exc_info=True)
             self.cross_encoder_model = None
+        
+        gc.collect()
+        logger.info("🧹 Đã dọn dẹp RAM đệm sau khi khởi tạo hệ thống (Thu hồi ~200MB).")
 
     def create_database(self, documents):
         """
