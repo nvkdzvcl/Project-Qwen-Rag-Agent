@@ -20,8 +20,8 @@ from frontend.styles import inject_global_styles
 
 # Local Ollama tags and their user-facing labels.
 MODEL_LABELS = {
+    "qwen2.5:3b": "qwen2.5:3b (it RAM, uu tien may yeu)",
     "qwen2.5:7b": "qwen2.5:7b (Q4_K_M - khuyen nghi)",
-    "qwen2.5:14b": "qwen2.5:14b (chat luong cao hon, ton RAM)",
 }
 MODEL_OPTIONS = list(MODEL_LABELS.keys())
 
