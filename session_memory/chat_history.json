@@ -446,5 +446,34 @@
         "usage_metadata": null
       }
     }
+  ],
+  "06650dc8-2477-4f14-8529-d06d943c7c74": [
+    {
+      "type": "human",
+      "data": {
+        "content": "tài liệu này nói về điều gì",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "Tài liệu này giới thiệu về hệ quản trị cơ sở dữ liệu trong bài tập thực hành số 2 về quản lý bán hàng. Nội dung bao gồm việc tạo các trigger kiểm tra doanh số, giá bán và ngăn chặn việc xóa sản phẩm có giá cao; cũng như viết các hàm để tính toán số lượng hóa đơn, tổng tiền bán của nhân viên, giá bán sản phẩm và tổng doanh thu của nhân viên theo tháng năm cụ thể.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    }
   ]
 }
