@@ -1,0 +1,246 @@
+\documentclass[a4paper]{article}
+\usepackage{vntex}
+%\usepackage[english,vietnam]{babel}
+%\usepackage[utf8]{inputenc}
+
+%\usepackage[utf8]{inputenc}
+%\usepackage[francais]{babel}
+\usepackage{a4wide,amssymb,epsfig,latexsym,multicol, array,hhline,fancyhdr}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{tikz}     % <--- Gói quan trọng để vẽ khung
+\usetikzlibrary{calc} % <--- Thư viện để tính toán toạ độ khung
+\usepackage{lastpage}
+\usepackage[lined,boxed,commentsnumbered]{algorithm2e}
+\usepackage{enumerate}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{graphicx}             % Standard graphics package
+\usepackage{array}
+\usepackage{tabularx, caption}
+\usepackage{subcaption}
+\usepackage{placeins}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage[framemethod=tikz]{mdframed}% For highlighting paragraph backgrounds
+\usepackage{multicol}
+\usepackage{rotating}
+\usepackage{graphics}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{epsfig}
+\usepackage{tikz}
+% Add your packages here
+\usepackage{float}
+\usepackage{listings}
+\usetikzlibrary{arrows, snakes, backgrounds}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\hypersetup{urlcolor=blue,linkcolor=black,citecolor=black,colorlinks=true} 
+%\usepackage{pstcol}                % PSTricks with the standard color package
+
+\newtheorem{theorem}{{\bf Định lý}}
+\newtheorem{property}{{\bf Tính chất}}
+\newtheorem{proposition}{{\bf Mệnh đề}}
+\newtheorem{corollary}[proposition]{{\bf Hệ quả}}
+\newtheorem{lemma}[proposition]{{\bf Bổ đề}}
+
+\everymath{\color{blue}}
+%\usepackage{fancyhdr}
+\setlength{\headheight}{40pt}
+\pagestyle{fancy}
+\fancyhead{} % clear all header fields
+\fancyhead[L]{
+ \begin{tabular}{rl}
+    \begin{picture}(25,15)(0,0)
+    \put(0,-8){\includegraphics[width=8mm, height=8mm]{logoITSGUsmall.png}}
+    %\put(0,-8){\epsfig{width=10mm,figure=hcmut.eps}}
+   \end{picture}&
+  %\includegraphics[width=8mm, height=8mm]{hcmut.png} & %
+  \begin{tabular}{l}
+    \textbf{\bf \ttfamily Trường Đại học Sài Gòn}\\
+    \textbf{\bf \ttfamily Khoa Công Nghệ Thông Tin}
+  \end{tabular}   
+ \end{tabular}
+}
+\fancyhead[R]{
+  \begin{tabular}{l}
+    \tiny \bf \\
+    \tiny \bf 
+  \end{tabular}  }
+\fancyfoot{} % clear all footer fields
+\fancyfoot[L]{\scriptsize \ttfamily Bài tập lớn môn Hệ thống thông tin doanh nghiệp - Niên khóa 2025-2026}
+\fancyfoot[R]{\scriptsize \ttfamily Trang {\thepage}/\pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0.3pt}
+
+
+%%%
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{3}
+\makeatletter
+\newcounter {subsubsubsection}[subsubsection]
+\renewcommand\thesubsubsubsection{\thesubsubsection .\@alph\c@subsubsubsection}
+\newcommand\subsubsubsection{\@startsection{subsubsubsection}{4}{\z@}%
+                                     {-3.25ex\@plus -1ex \@minus -.2ex}%
+                                     {1.5ex \@plus .2ex}%
+                                     {\normalfont\normalsize\bfseries}}
+\newcommand*\l@subsubsubsection{\@dottedtocline{3}{10.0em}{4.1em}}
+\newcommand*{\subsubsubsectionmark}[1]{}
+\makeatother
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Matlab,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3,
+  numbers=left,
+  stepnumber=1,
+  numbersep=1pt,    
+  firstnumber=1,
+  numberfirstline=true
+}
+% Cấu hình lề trang (Căn chỉnh lại cho đẹp mắt với khung)
+\geometry{
+  left=3cm,
+  right=2cm,
+  top=2cm,
+  bottom=2cm
+}
+
+\newenvironment{example}{\bgroup\par\noindent\textbf{Example}\par%
+\[}{\]\egroup}
+\begin{document}
+
+\begin{titlepage}
+  % ==========================================================
+  % VẼ KHUNG 
+  % ==========================================================
+  \begin{tikzpicture}[overlay, remember picture]
+    % Khung viền ngoài (nét đậm)
+    \draw [line width=3pt]
+    ($ (current page.north west) + (2.0cm,-2.0cm) $)
+    rectangle
+    ($ (current page.south east) + (-2.0cm,2.0cm) $);
+    
+    % Khung viền trong (nét mảnh - tạo hiệu ứng khung đôi)
+    \draw [line width=1pt]
+    ($ (current page.north west) + (2.15cm,-2.15cm) $)
+    rectangle
+    ($ (current page.south east) + (-2.15cm,2.15cm) $); 
+  \end{tikzpicture}
+  % ==========================================================
+  % KẾT THÚC VẼ KHUNG
+  % ==========================================================
+  
+  \begin{center}
+    \textbf{TRƯỜNG ĐẠI HỌC SÀI GÒN} \\
+    \textbf{KHOA CÔNG NGHỆ THÔNG TIN}
+  \end{center}
+  \vspace{1cm}
+  
+  \begin{figure}[h!]
+    \begin{center}
+      % Chú ý: Bạn cần có file logoITSGU.png trong cùng thư mục
+      % Nếu chưa có logo, hãy tạm thời comment dòng dưới lại (%)
+      \includegraphics[width=3cm]{logoITSGU.png}
+    \end{center}
+  \end{figure}
+  
+  \vspace{1cm}
+  
+  \begin{center}
+    \begin{tabular}{c}
+      \multicolumn{1}{l}{\textbf{{\Large HỆ THỐNG THÔNG TIN DOANH NGHIỆP}}} \\
+      ~~                                                                   \\
+      \hline
+      \\
+      \\
+
+      \textbf{{\Huge Website bán quần áo}}                                 \\
+      \\
+      \hline
+    \end{tabular}
+  \end{center}
+  
+  \vspace{2cm} % Đã điều chỉnh khoảng cách này một chút cho cân đối
+  
+  \begin{table}[h!]
+    \begin{tabular}{rrl}
+      \hspace{4cm} & \textbf{GVHD:} & \textbf{Lê Nhị Lãm Thuý}  \\ % Đã thêm bold cho đẹp
+                   &                &                                 \\ % Dòng trống
+                   & SV:          & Nguyễn Công Quân - 3123560070       \\
+                   & SV:          & Lê Hữu Huy - 3123560033         \\
+                   & SV:          & Nguyễn Văn Khanh - 3123560042       \\
+                   & SV:          & Huỳnh Chí Văn - 3123560092       \\ 
+    \end{tabular}
+  \end{table}
+  
+  \vfill % Tự động đẩy ngày tháng xuống đáy trang (trên khung dưới)
+  
+  \begin{center}
+    {\footnotesize TP. HỒ CHÍ MINH, THÁNG 4/2026}
+  \end{center}
+  
+\end{titlepage}
+
+
+
+\thispagestyle{empty}
+\newpage
+\tableofcontents
+\newpage
+
+\begin{table}[h!]
+  \centering
+  \caption{\textbf{Bảng phân công công việc và đánh giá mức độ hoàn thành}}
+  \vspace{0.3cm}
+  \begin{tabular}{|c|l|p{7.5cm}|c|}
+    \hline
+    \textbf{STT} & \textbf{Họ và tên} & \centering\textbf{Nội dung công việc} & \textbf{Đóng góp} \\
+    \hline
+    1 & Lê Hữu Huy & - \textbf{Backend chủ đạo}: Xử lý luồng Giỏ hàng, Thanh toán, Đơn hàng,.. \newline - Hỗ trợ Frontend tích hợp API \newline - Tham gia phát triển module Admin & 25\% \\
+    \hline
+    2 & Nguyễn Công Quân & - Trưởng nhóm, Thiết kế CSDL (Database) \newline - \textbf{Frontend User}: Code toàn bộ giao diện người dùng, Chat AI ,.. \newline - Tham gia phát triển module Admin & 25\% \\
+    \hline
+    3 & Nguyễn Văn Khanh & - Fullstack các chức năng phụ: Tìm kiếm, Lọc SP \newline - Backend: Xác thực người dùng (Auth) \newline - Tham gia phát triển module Admin
+    - Vẽ các biểu đồ thiết kế hệ thống (UML, ERD) \newline - Tạo dữ liệu mẫu (Data Seeding) cho Database \newline - Rà soát lỗi chính tả báo cáo & 25\% \\
+    \hline
+    4 & Huỳnh Chí Văn & - \textbf{Frontend Admin}: Thiết kế giao diện trang quản trị \newline - Tổng hợp nội dung, soạn thảo Báo cáo chính \newline - Nhập liệu sản phẩm 
+    mẫu. \newline - Kiểm thử website (Manual Testing), bắt lỗi \newline - Hỗ trợ cắt ghép hình ảnh sản phẩm  & 25\% \\
+    \hline
+  \end{tabular}
+\end{table}
+
+
+\newpage
+\addcontentsline{toc}{section}{Tài liệu tham khảo}
+\renewcommand{\refname}{Tài liệu tham khảo}
+\begin{thebibliography}{99}
+
+% Nhóm sách rường cột về Phân tích thiết kế hệ thống (Phương pháp luận DFD/ERD)
+\bibitem{pttk1}
+Nguyễn Văn Vỵ (2007), \textit{Phân tích Thiết kế Hệ thống Thông tin quản lý}, NXB Giáo dục, Hà Nội.
+
+\end{thebibliography}
+
+\end{document}
+

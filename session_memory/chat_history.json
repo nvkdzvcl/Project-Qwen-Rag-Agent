@@ -417,5 +417,63 @@
         "usage_metadata": null
       }
     }
+  ],
+  "fc40ab82-0e88-40ae-a02b-5bb085309701": [
+    {
+      "type": "human",
+      "data": {
+        "content": "file gồm bao nhiêu phần? tóm tắt nội dung từng phần",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "File này được chia thành 9 câu hỏi chính và một bài tập về phân tích thiết kế hướng đối tượng. Cụ thể như sau:\n\n1. Phần đầu giới thiệu khung nhìn trong phân tích thiết kế hướng đối tượng.\n2. Phần tiếp theo là chi tiết về biểu đồ trình tự, bao gồm mục tiêu, chức năng xây dựng và các thành phần của biểu đồ.\n3. Tiếp theo là phần về biểu đồ trạng thái, cũng như mục tiêu, chức năng và các thành phần của nó.\n4. Sau đó là giải thích về biểu đồ hoạt động, cùng mục tiêu, chức năng và các thành phần cần thiết.\n5. Phần thứ năm giới thiệu về biểu đồ use case và công việc cần thực hiện để xây dựng.\n6. Phần tiếp theo trình bày về biểu đồ lớp và công việc cần làm để tạo ra biểu đồ này.\n7. Bài tập đề cập đến yêu cầu của Công ty VNFOOD trong việc xây dựng một trang web quảng cáo ẩm thực tại Việt Nam, bao gồm các chức năng cho khách truy cập, thành viên và người quản trị.\n\nTóm lại, file này hướng dẫn về các khía cạnh quan trọng của phân tích thiết kế hướng đối tượng thông qua các biểu đồ và công việc cần làm.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    }
+  ],
+  "4a792128-1c58-4397-b62f-d918ca97d0e9": [
+    {
+      "type": "human",
+      "data": {
+        "content": "tóm tắt nội dung file",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "Tôi không biết nội dung cụ thể của file bạn muốn tóm tắt. Để tôi có thể giúp đỡ hiệu quả, bạn vui lòng cung cấp thêm thông tin về file cần tóm tắt nhé.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    }
   ]
 }
