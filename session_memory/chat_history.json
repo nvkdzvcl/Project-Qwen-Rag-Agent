@@ -417,5 +417,34 @@
         "usage_metadata": null
       }
     }
+  ],
+  "6b56122c-72c7-419a-a4b3-83ad0b3666f8": [
+    {
+      "type": "human",
+      "data": {
+        "content": "tóm tắt yêu cầu file trên",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "File này bao gồm cấu trúc của một bài báo hoặc đề án, tập trung vào hệ thống RAG (Retrieval-Augmented Generation) sử dụng Large Language Models. Nội dung chính được chia thành các phần như Giới thiệu, Cơ sở lý thuyết và Ưu nhược điểm. Trong đó có nêu rõ về Test Case đã thực hiện, kết quả đạt được, cùng vớiPrompt Template bao gồm các thành phần Instruction, Context, Question và Constraint.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    }
   ]
 }

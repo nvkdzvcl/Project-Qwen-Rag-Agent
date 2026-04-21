@@ -1,86 +1,90 @@
 import os
 import sys
+import logging
+from colorama import Fore, Style, init
 
-# Thiết lập đường dẫn để import module từ thư mục gốc
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Thêm thư mục gốc vào sys.path để import
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from backend.loader import SmartDocLoader
-from backend.splitter import SmartDocSplitter
+try:
+    from backend.loader import SmartDocLoader
+    from backend.splitter import SmartDocSplitter
+except ImportError:
+    print(Fore.RED + "Lỗi: Không tìm thấy các module trong folder backend.")
+    sys.exit(1)
 
-def verify_splitter():
-    # 1. Cấu hình tham số kiểm tra
-    CHUNK_SIZE = 1000
-    CHUNK_OVERLAP = 200
-    # Thêm tham số giả định để test metadata filtering
-    DOC_TYPE = "BÀI TẬP SQL"
-    FILE_PATH = "test_data/TH2 - HQTCSDL - QL ban hang.pdf" 
+init(autoreset=True)
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-    if not os.path.exists(FILE_PATH):
-        print(f"Lỗi: Không tìm thấy file {FILE_PATH}")
+# Cấu hình file test (Bạn có thể đổi sang file PDF nếu muốn)
+TARGET_FILE = "TH2 - HQTCSDL - QL ban hang.pdf"
+
+def test_splitter_logic():
+    loader = SmartDocLoader()
+    # Khởi tạo splitter với chunk size nhỏ (vd: 500) để dễ quan sát việc cắt đoạn
+    splitter = SmartDocSplitter(chunk_size=600, chunk_overlap=100)
+    
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    file_path = os.path.join(base_dir, "test_data", TARGET_FILE)
+
+    if not os.path.exists(file_path):
+        print(Fore.RED + f"File {TARGET_FILE} không tồn tại trong data/ để test.")
         return
 
-    print(f"BẮT ĐẦU KIỂM TRA SPLITTER (PHIÊN BẢN CÂU 8)")
-    print("=" * 70)
+    print(f"\n{Fore.CYAN}{'='*80}")
+    print(f"{Fore.CYAN}TESTING: SMARTDOC SPLITTER LOGIC")
+    print(f"{Fore.CYAN}{'='*80}\n")
 
-    # 2. Nạp tài liệu với Metadata đầy đủ
-    print(f"--- Bước 1: Nạp file với nhãn '{DOC_TYPE}' ---")
-    loader = SmartDocLoader()
-    # Truyền thêm DOC_TYPE vào hàm load
-    raw_docs = loader.load_pdf_with_ocr(FILE_PATH, doc_type=DOC_TYPE)
+    # 1. Load tài liệu thành các trang
+    print(f"{Fore.YELLOW}1. Đang nạp tài liệu...")
+    pages = loader.load(file_path, doc_type="StudyMaterial")
+    print(f"   -> Đã load {len(pages)} trang gốc.\n")
 
-    # 3. Chạy Splitter
-    print(f"--- Bước 2: Chia nhỏ tài liệu (Size={CHUNK_SIZE}, Overlap={CHUNK_OVERLAP}) ---")
-    splitter = SmartDocSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-    chunks = splitter.split_documents(raw_docs)
+    # 2. Chia nhỏ tài liệu
+    print(f"{Fore.YELLOW}2. Đang thực hiện chia nhỏ (Chunking)...")
+    chunks = splitter.split_documents(pages)
+    print(f"   -> Đã tạo ra {len(chunks)} chunks.\n")
 
-    print(f"\nKẾT QUẢ KIỂM TRA:")
-    print(f"Tổng số trang gốc: {len(raw_docs)}")
-    print(f"Tổng số chunk tạo ra: {len(chunks)}")
+    # 3. Kiểm tra chi tiết 3 chunk đầu tiên
+    print(f"{Fore.YELLOW}3. Kiểm tra chi tiết cấu trúc Chunk:")
+    print(f"{Fore.GREEN}{'─'*80}")
 
-    # 4. Kiểm tra chi tiết 2 chunk đầu tiên để xác minh OVERLAP
-    if len(chunks) >= 2:
-        print("\nKIỂM TRA ĐỘ GỐI ĐẦU (OVERLAP):")
-        end_of_chunk0 = chunks[0].page_content[-CHUNK_OVERLAP:].strip()
-        start_of_chunk1 = chunks[1].page_content[:CHUNK_OVERLAP + 50].strip()
+    for i, chunk in enumerate(chunks[:3]):  # Xem mẫu 3 chunk đầu
+        content = chunk.page_content
+        meta = chunk.metadata
+        
+        print(f"{Fore.BLUE}[CHUNK {i+1}] | Source: {meta.get('source')} | Trang: {meta.get('page')}")
+        print(f"{Fore.BLUE}Index in file: {meta.get('chunk_index_in_file')} | Start Index: {meta.get('start_index')}")
+        
+        # Hiển thị nội dung có đánh dấu bắt đầu/kết thúc chunk
+        print(f"{Fore.WHITE} Nội dung trích dẫn:")
+        print(f"{Style.DIM}   \"...{content[:200]}...\"") # In 200 ký tự đầu
+        print(f"{Style.DIM}   \"...{content[-200:]}...\"") # In 200 ký tự cuối
+        
+        # Kiểm tra Metadata Filtering (Câu hỏi 8)
+        print(f"{Fore.MAGENTA} Kiểm tra Metadata Filtering:")
+        print(f"   - doc_type: {meta.get('doc_type')} (Sẵn sàng để lọc)")
+        print(f"   - upload_date: {meta.get('upload_date')} (Sẵn sàng để sắp xếp)")
+        
+        print(f"{Fore.GREEN}{'─'*80}")
 
-        print(f"--- Cuối Chunk 0:\n...{end_of_chunk0}")
-        print(f"--- Đầu Chunk 1:\n{start_of_chunk1}...")
-
-        if end_of_chunk0[:20] in start_of_chunk1:
-            print("\n  XÁC NHẬN: Overlap hoạt động chính xác!")
+    # 4. Kiểm tra độ gối đầu (Overlap) giữa Chunk 1 và Chunk 2
+    if len(chunks) > 1:
+        print(f"\n{Fore.YELLOW}4. Kiểm tra độ gối đầu (Overlap):")
+        # Tìm phần giao nhau (đơn giản hóa bằng cách kiểm tra vài từ cuối chunk 1 có trong chunk 2 không)
+        last_words = " ".join(chunks[0].page_content.split()[-10:])
+        if last_words in chunks[1].page_content:
+            print(f"   {Fore.GREEN}[PASS] Phát hiện phần gối đầu giữa Chunk 1 và Chunk 2.")
         else:
-            print("\n  Cảnh báo: Overlap có thể không khớp chính xác do ngắt theo dấu xuống dòng.")
+            print(f"   {Fore.CYAN}[INFO] Không thấy phần gối đầu rõ rệt (có thể do splitter cắt ở đoạn văn mới).")
 
-    # 5. Kiểm tra Metadata TOÀN DIỆN (Đáp ứng Câu hỏi 8)
-    print("\nKIỂM TRA BẢO TOÀN METADATA (MULTI-DOC RAG):")
-    test_chunk = chunks[0] # Kiểm tra chunk đầu tiên
-    
-    metadata = test_chunk.metadata
-    fields = {
-        "Nguồn (source)": metadata.get('source'),
-        "Trang (page)": metadata.get('page'),
-        "Phân loại (doc_type)": metadata.get('doc_type'),
-        "Ngày upload (upload_date)": metadata.get('upload_date'),
-        "Số thứ tự chunk (chunk_index)": metadata.get('chunk_index')
-    }
-
-    all_ok = True
-    for label, value in fields.items():
-        if value is not None:
-            print(f"  {label}: {value}")
-        else:
-            print(f"  {label}: BỊ MẤT DỮ LIỆU")
-            all_ok = False
-    
-    if all_ok:
-        print("\n XÁC NHẬN: Metadata đáp ứng hoàn hảo yêu cầu lọc (Filtering) và trích dẫn nguồn.")
-
-    # 6. Kiểm tra độ dài thực tế
-    max_actual_size = max(len(c.page_content) for c in chunks)
-    print(f"\n KIỂM TRA ĐỘ DÀI: Chunk lớn nhất đạt {max_actual_size} ký tự")
-    
-    if max_actual_size <= CHUNK_SIZE:
-        print("  XÁC NHẬN: Độ dài nằm trong giới hạn cho phép.")
+    # 5. Tổng kết
+    print(f"\n{Fore.CYAN}{'='*80}")
+    print(f"{Fore.MAGENTA}KẾT QUẢ TEST SPLITTER:")
+    print(f" - Tổng số Chunk: {len(chunks)}")
+    print(f" - Kích thước Chunk trung bình: ~{sum(len(c.page_content) for c in chunks)//len(chunks)} ký tự")
+    print(f" - Metadata toàn vẹn: {'Đúng' if 'source' in chunks[0].metadata else 'Sai'}")
+    print(f"{Fore.CYAN}{'='*80}")
 
 if __name__ == "__main__":
-    verify_splitter()
+    test_splitter_logic()

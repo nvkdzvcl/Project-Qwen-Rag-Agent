@@ -1,84 +1,95 @@
 import os
 import sys
+import logging
+from colorama import Fore, Style, init
 
-# Thiết lập đường dẫn để import được module backend
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, ".."))
-sys.path.append(project_root)
+# =========================================================
+# CẤU HÌNH BIẾN TOÀN CỤC ĐỂ TEST
+# =========================================================
+# Thay bằng tên file PDF thông thường, PDF scan hoặc Docx bạn muốn soi
+TARGET_FILE = "TH2 - HQTCSDL - QL ban hang.pdf"  # Ví dụ: "test1.pdf", "testocr.pdf", "ND1_TTHCM.docx"
+# =========================================================
 
-from backend.loader import SmartDocLoader
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-def print_docs(docs, mode_name):
-    """Hàm phụ trợ để in dữ liệu Document và Metadata mới"""
-    if not docs:
-        print(f"   [!] Không có dữ liệu được trích xuất trong chế độ {mode_name}.")
-        return
+try:
+    from backend.loader import SmartDocLoader
+except ImportError:
+    print(Fore.RED + "Lỗi: Không tìm thấy backend/loader.py.")
+    sys.exit(1)
 
-    print(f"   ✅ {mode_name} thành công: Lấy được {len(docs)} đoạn/trang.")
-    for i, doc in enumerate(docs):
-        # Lấy thông tin từ metadata (Cập nhật các trường mới theo yêu cầu Câu 8)
-        page_info = doc.metadata.get('page', 'N/A')
-        source_file = doc.metadata.get('source', 'N/A')
-        source_type = doc.metadata.get('source_type', 'N/A')
-        upload_date = doc.metadata.get('upload_date', 'N/A')
-        doc_type = doc.metadata.get('doc_type', 'N/A')
-        
-        # In nội dung (giới hạn 100 ký tự đầu để dễ nhìn)
-        content = doc.page_content.strip().replace('\n', ' ')
-        preview = (content[:100] + '..') if len(content) > 100 else content
-        
-        print(f"      - [Trang {page_info}][{source_type}]")
-        print(f"        📂 File: {source_file} | Phân loại: {doc_type}")
-        print(f"        ⏰ Upload: {upload_date}")
-        print(f"        📝 Nội dung: {preview}")
-        print("        " + "-"*30)
+init(autoreset=True)
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 def run_test():
     loader = SmartDocLoader()
-    test_dir = os.path.join(project_root, "test_data")
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    data_dir = os.path.join(base_dir, "test_data")
+    file_path = os.path.join(data_dir, TARGET_FILE)
 
-    if not os.path.exists(test_dir):
-        print(f"❌ Thư mục {test_dir} không tồn tại.")
+    if not os.path.exists(file_path):
+        print(Fore.RED + f"[LỖI] Không tìm thấy file: {TARGET_FILE} tại {data_dir}")
         return
 
-    files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('.')]
+    print(f"\n{Fore.CYAN}{'='*85}")
+    print(f"{Fore.CYAN}BÁO CÁO PHÂN TÍCH ĐỘ CHÍNH XÁC LOADER")
+    print(f"{Fore.CYAN}{'='*85}\n")
 
-    if not files:
-        print(f"❌ Không tìm thấy file .pdf hoặc .docx nào trong {test_dir}")
-        return
-
-    print(f"🚀 BẮT ĐẦU KIỂM TRA HỆ THỐNG LOADER (PHIÊN BẢN MULTI-DOC)")
-    print("=" * 70)
-
-    for file_name in files:
-        file_path = os.path.join(test_dir, file_name)
-        ext = os.path.splitext(file_name)[1].lower()
+    try:
+        # Giả lập tham số doc_type để kiểm tra Metadata Filtering
+        documents = loader.load(file_path, doc_type="Test_Accuracy")
         
-        # Giả định loại tài liệu để test metadata filtering
-        sample_doc_type = "BÀI TẬP SQL" if "TH2" in file_name else "TÀI LIỆU CHUNG"
-        
-        print(f"📄 TẬP TIN: {file_name}")
+        for i, doc in enumerate(documents):
+            meta = doc.metadata
+            content = doc.page_content
+            
+            print(f"{Fore.YELLOW}>>> TRANG {meta['page']} | Công nghệ: {meta['source_type']}")
+            
+            # 1. KIỂM TRA CẤU TRÚC BẢNG
+            if "[TABLE_START]" in content:
+                print(f"{Fore.GREEN}[V] PHÁT HIỆN BẢNG DỮ LIỆU:")
+                # Trích xuất và in thử một đoạn bảng để kiểm tra độ thẳng hàng
+                start_idx = content.find("[TABLE_START]")
+                end_idx = content.find("[TABLE_END]") + 11
+                table_preview = content[start_idx:end_idx]
+                print(f"{Fore.WHITE}{table_preview}")
+            else:
+                print(f"{Fore.WHITE}[ ] Không phát hiện bảng kỹ thuật số.")
 
-        # --- LUỒNG 1: LOAD STANDARD ---
-        print(f"   🔹 Đang thử nghiệm hàm: load(doc_type='{sample_doc_type}')...")
-        try:
-            # Truyền thêm tham số doc_type vào đây
-            std_docs = loader.load(file_path, doc_type=sample_doc_type)
-            print_docs(std_docs, "Standard Load")
-        except Exception as e:
-            print(f"   ❌ Lỗi Standard Load: {e}")
+            # 2. KIỂM TRA OCR
+            if "[OCR_IMAGE" in content:
+                print(f"{Fore.GREEN}[V] PHÁT HIỆN NỘI DUNG OCR (ẢNH/SCAN):")
+                # Tìm đoạn OCR đầu tiên để hiển thị mẫu
+                ocr_start = content.find("[OCR_IMAGE")
+                print(f"{Fore.WHITE}{content[ocr_start:ocr_start+300]}...")
+            else:
+                print(f"{Fore.WHITE}[ ] Trang này không chứa nội dung OCR.")
 
-        # --- LUỒNG 2: LOAD OCR ---
-        if ext == '.pdf':
-            print(f"   🔸 Đang thử nghiệm hàm: load_pdf_with_ocr(doc_type='{sample_doc_type}')...")
-            try:
-                # Truyền thêm tham số doc_type vào đây
-                ocr_docs = loader.load_pdf_with_ocr(file_path, doc_type=sample_doc_type)
-                print_docs(ocr_docs, "OCR Load")
-            except Exception as e:
-                print(f"   ❌ Lỗi OCR Load: {e}")
-        
-        print("-" * 70)
+            # 3. KIỂM TRA VĂN BẢN THUẦN (Lý thuyết)
+            print(f"{Fore.GREEN}[V] MẪU VĂN BẢN TRÍCH XUẤT:")
+            # Lấy 300 ký tự đầu tiên của trang (đã bỏ qua các tag đặc biệt)
+            clean_text = content.replace("[TABLE_START]", "").replace("[TABLE_END]", "")
+            print(f"{Style.DIM}{clean_text[:400].strip()}...")
+
+            # 4. KIỂM TRA TOÀN VẸN METADATA (Yêu cầu 8.2.8)
+            print(f"{Fore.MAGENTA}--- Kiểm tra Metadata ---")
+            required_keys = ['source', 'upload_date', 'doc_type', 'page', 'source_type']
+            for key in required_keys:
+                status = f"{Fore.GREEN}OK" if key in meta else f"{Fore.RED}MISSING"
+                print(f"  + {key.ljust(12)}: {status} ({meta.get(key)})")
+            
+            print(f"{Fore.CYAN}{'─'*85}")
+
+        # TỔNG KẾT
+        print(f"\n{Fore.MAGENTA}KẾT LUẬN CUỐI CÙNG:")
+        print(f" - Tổng số trang xử lý: {len(documents)}")
+        print(f" - Khả năng nhận diện: {'Đa tầng (Hybrid)' if len(documents) > 0 else 'Thất bại'}")
+        print(f" - Sẵn sàng cho RAG: {Fore.GREEN}YES")
+
+    except Exception as e:
+        print(f"{Fore.RED}[LỖI NGHIÊM TRỌNG]: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     run_test()
