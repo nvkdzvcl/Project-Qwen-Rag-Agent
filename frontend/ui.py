@@ -7,17 +7,23 @@ Tổ chức: cấu hình trang → state → CSS (styles.py) → sidebar → t�
 from __future__ import annotations
 
 import uuid
+import tempfile
+import os
+import logging
 from pathlib import Path
 from typing import Dict, List
+from datetime import datetime
 
-import pdfplumber
 import streamlit as st
 from langchain_core.documents import Document
 
 from backend.controller import RAGController
+from backend.loader import SmartDocLoader
 from backend.splitter import SmartDocSplitter
 from frontend.constants import MAX_PDF_BYTES
 from frontend.styles import inject_global_styles
+
+logger = logging.getLogger(__name__)
 
 # Avatar images
 _BASE = Path(__file__).parent.parent
@@ -50,8 +56,30 @@ def init_state() -> None:
             st.error(f"Lỗi khởi tạo hệ thống: {e}")
             st.session_state.rag_controller = None
 
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    # Quản lý nhiều cuộc hội thoại
+    if "conversations" not in st.session_state:
+        st.session_state.conversations = {}  # {conversation_id: {name, messages, created_at, uploaded_files}}
+    
+    if "active_conversation_id" not in st.session_state:
+        # Tạo cuộc hội thoại đầu tiên
+        first_conv_id = str(uuid.uuid4())
+        st.session_state.conversations[first_conv_id] = {
+            "name": "Hội thoại 1",
+            "messages": [],
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "uploaded_files": []  # Danh sách file đã upload trong cuộc hội thoại này
+        }
+        st.session_state.active_conversation_id = first_conv_id
+    
+    # Backward compatibility - migrate old chat_history if exists
+    if "chat_history" in st.session_state and st.session_state.chat_history:
+        active_id = st.session_state.active_conversation_id
+        if active_id in st.session_state.conversations:
+            st.session_state.conversations[active_id]["messages"] = st.session_state.chat_history
+            # Thêm uploaded_files nếu chưa có
+            if "uploaded_files" not in st.session_state.conversations[active_id]:
+                st.session_state.conversations[active_id]["uploaded_files"] = []
+        del st.session_state.chat_history
 
     if "vector_ready" not in st.session_state:
         ctrl = st.session_state.get("rag_controller")
@@ -80,12 +108,13 @@ def init_state() -> None:
         st.session_state.cfg_advanced_mode = False
     if "cfg_filter_filename" not in st.session_state:
         st.session_state.cfg_filter_filename = ""
-    if "confirm_clear_history" not in st.session_state:
-        st.session_state.confirm_clear_history = False
     if "confirm_clear_vector" not in st.session_state:
         st.session_state.confirm_clear_vector = False
     if "selected_chat_idx" not in st.session_state:
         st.session_state.selected_chat_idx = None
+    
+    if "conversation_counter" not in st.session_state:
+        st.session_state.conversation_counter = 1
 
 
 # ---------------------------------------------------------------------------
@@ -93,27 +122,76 @@ def init_state() -> None:
 # ---------------------------------------------------------------------------
 
 def _parse_and_split(uploaded_file) -> List[Document]:
-    """Đọc PDF → list[Document] rồi split bằng SmartDocSplitter."""
-    raw_docs: List[Document] = []
-    with pdfplumber.open(uploaded_file) as pdf:
-        for i, page in enumerate(pdf.pages):
-            text = page.extract_text() or ""
+    """Đọc file (PDF/DOCX/DOC/TXT) → list[Document] rồi split bằng SmartDocSplitter."""
+    try:
+        # Lưu file tạm để loader có thể đọc
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_path = tmp_file.name
+        
+        # Xác định loại file
+        file_ext = uploaded_file.name.split('.')[-1].lower()
+        
+        raw_docs: List[Document] = []
+        
+        if file_ext in ['pdf', 'docx']:
+            # Dùng SmartDocLoader cho PDF và DOCX (hỗ trợ OCR, table extraction)
+            loader = SmartDocLoader()
+            raw_docs = loader.load(tmp_path, doc_type="general")
+            logger.info(f"✅ Đã load {len(raw_docs)} pages/sections từ {uploaded_file.name} bằng SmartDocLoader")
+        
+        elif file_ext == 'txt':
+            # Đọc text thuần
+            with open(tmp_path, 'r', encoding='utf-8') as f:
+                text = f.read()
             if text.strip():
                 raw_docs.append(
                     Document(
                         page_content=text,
-                        metadata={"source": uploaded_file.name, "page": i},
+                        metadata={
+                            "source": uploaded_file.name,
+                            "file_name": uploaded_file.name,
+                            "page": 1,
+                            "doc_type": "txt"
+                        }
                     )
                 )
+            logger.info(f"✅ Đã load file TXT: {uploaded_file.name}")
+        
+        else:
+            # Fallback cho các định dạng khác
+            logger.warning(f"⚠️ Định dạng file {file_ext} chưa được hỗ trợ đầy đủ, thử đọc như text")
+            with open(tmp_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = f.read()
+            if text.strip():
+                raw_docs.append(
+                    Document(
+                        page_content=text,
+                        metadata={
+                            "source": uploaded_file.name,
+                            "file_name": uploaded_file.name,
+                            "page": 1,
+                            "doc_type": file_ext
+                        }
+                    )
+                )
+        
+        # Xóa file tạm
+        os.unlink(tmp_path)
+        
+        if not raw_docs:
+            return []
 
-    if not raw_docs:
-        return []
-
-    splitter = SmartDocSplitter(
-        chunk_size=st.session_state.cfg_chunk,
-        chunk_overlap=st.session_state.cfg_overlap,
-    )
-    return splitter.split_documents(raw_docs)
+        # Split documents thành chunks
+        splitter = SmartDocSplitter(
+            chunk_size=st.session_state.cfg_chunk,
+            chunk_overlap=st.session_state.cfg_overlap,
+        )
+        return splitter.split_documents(raw_docs)
+    
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi xử lý file {uploaded_file.name}: {str(e)}")
+        raise e
 
 
 def _sources_to_citations(sources: List[Dict]) -> List[Dict]:
@@ -134,32 +212,6 @@ def _sources_to_citations(sources: List[Dict]) -> List[Dict]:
 
 def _render_confirm_dialogs() -> None:
     """Hiển thị modal confirm nếu cần — gọi ở ngoài sidebar."""
-
-    if st.session_state.get("confirm_clear_history"):
-        st.markdown(
-            """
-            <div class="modal-overlay">
-                <div class="modal-box">
-                    <div class="modal-title"> Xóa lịch sử chat?</div>
-                    <div class="modal-body">Toàn bộ lịch sử hội thoại sẽ bị xóa vĩnh viễn.</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        col1, col2, col3 = st.columns([3, 1, 1])
-        with col2:
-            if st.button("Xóa", type="primary", key="dlg_yes_hist", use_container_width=True):
-                st.session_state.chat_history = []
-                ctrl = st.session_state.get("rag_controller")
-                if ctrl:
-                    ctrl.clear_chat_history(session_id=st.session_state.session_id)
-                st.session_state.confirm_clear_history = False
-                st.rerun()
-        with col3:
-            if st.button("Huỷ", key="dlg_no_hist", use_container_width=True):
-                st.session_state.confirm_clear_history = False
-                st.rerun()
 
     if st.session_state.get("confirm_clear_vector"):
         st.markdown(
@@ -210,7 +262,7 @@ def render_sidebar() -> None:
         st.caption("Hỏi đáp tài liệu thông minh (RAG + Qwen)")
 
         st.markdown("### Hướng dẫn")
-        st.markdown("1. Tải lên PDF (tối đa 50 MB)")
+        st.markdown("1. Tải lên tài liệu (PDF/DOCX/DOC/TXT, tối đa 50 MB)")
         st.markdown("2. Bấm **Phân tích tài liệu**")
         st.markdown("3. Đặt câu hỏi và xem trích dẫn")
 
@@ -275,21 +327,81 @@ def render_sidebar() -> None:
             help="Để trống = tìm toàn bộ. Nhập tên file để lọc theo metadata.",
         )
 
-        st.markdown("### Lịch sử (gần đây)")
-        hist = st.session_state.chat_history
-        if not hist:
-            st.caption("Chưa có hội thoại.")
+        # Nút tạo cuộc hội thoại mới
+        st.markdown("### Cuộc hội thoại")
+        if st.button("+ Hội thoại mới", use_container_width=True, type="primary"):
+            new_conv_id = str(uuid.uuid4())
+            st.session_state.conversation_counter += 1
+            st.session_state.conversations[new_conv_id] = {
+                "name": f"Hội thoại {st.session_state.conversation_counter}",
+                "messages": [],
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "uploaded_files": []
+            }
+            st.session_state.active_conversation_id = new_conv_id
+            st.session_state.selected_chat_idx = None
+            st.rerun()
+        
+        st.markdown("---")
+        
+        # Hiển thị danh sách các cuộc hội thoại
+        active_id = st.session_state.active_conversation_id
+        conversations = st.session_state.conversations
+        
+        # Sắp xếp theo thời gian tạo (mới nhất trước)
+        sorted_convs = sorted(
+            conversations.items(),
+            key=lambda x: x[1]["created_at"],
+            reverse=True
+        )
+        
+        if not sorted_convs:
+            st.caption("Chưa có hội thoại nào.")
         else:
-            # Hiển thị 8 câu gần nhất, index thật trong chat_history
-            recent = list(enumerate(hist))[-8:]
-            for real_idx, item in reversed(recent):
-                q = item.get("question", "")[:50]
-                label = f" {q}…" if len(item.get("question","")) > 50 else f" {q}"
-                if st.button(label, key=f"hist_btn_{real_idx}", use_container_width=True):
-                    st.session_state.selected_chat_idx = real_idx
-
-        if st.button("Xóa lịch sử chat", use_container_width=True):
-            st.session_state.confirm_clear_history = True
+            for conv_id, conv_data in sorted_convs:
+                msg_count = len(conv_data["messages"])
+                conv_name = conv_data["name"]
+                file_count = len(conv_data.get("uploaded_files", []))
+                
+                # Highlight cuộc hội thoại đang active
+                is_active = (conv_id == active_id)
+                button_type = "secondary" if is_active else "tertiary"
+                
+                # Tạo label với số tin nhắn và số file
+                label = f"{conv_name} ({msg_count} tin, {file_count} file)"
+                if is_active:
+                    label = f"• {label}"
+                
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    if st.button(label, key=f"conv_{conv_id}", use_container_width=True, type=button_type):
+                        if conv_id != active_id:
+                            st.session_state.active_conversation_id = conv_id
+                            st.session_state.selected_chat_idx = None
+                            st.rerun()
+                
+                with col2:
+                    # Nút xóa cuộc hội thoại (không cho xóa nếu chỉ còn 1)
+                    if len(conversations) > 1:
+                        if st.button("X", key=f"del_{conv_id}", help="Xóa cuộc hội thoại này"):
+                            del st.session_state.conversations[conv_id]
+                            # Nếu xóa cuộc hội thoại đang active, chuyển sang cuộc khác
+                            if conv_id == active_id:
+                                st.session_state.active_conversation_id = list(conversations.keys())[0]
+                            st.rerun()
+        
+        st.markdown("---")
+        
+        # Hiển thị danh sách file của cuộc hội thoại hiện tại
+        active_conv = conversations.get(active_id, {})
+        uploaded_files_list = active_conv.get("uploaded_files", [])
+        
+        if uploaded_files_list:
+            st.markdown("### Tài liệu trong cuộc hội thoại này")
+            for file_info in uploaded_files_list:
+                st.caption(f"• {file_info['name']} ({file_info['size']})")
+        
+        st.markdown("---")
 
         if st.button("Xóa vector / tài liệu", use_container_width=True):
             st.session_state.confirm_clear_vector = True
@@ -343,52 +455,106 @@ def render_upload_section() -> None:
             """
             <div class="upload-banner">
                 <div class="upload-banner-title">Tải lên tài liệu</div>
-                <div class="upload-banner-desc">Sau khi tải, bấm nút phân tích để chuẩn bị hỏi đáp.</div>
+                <div class="upload-banner-desc">Hỗ trợ PDF, DOCX, DOC, TXT. Sau khi tải, bấm nút phân tích để chuẩn bị hỏi đáp.</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        uploaded_file = st.file_uploader(
-            "Tải file PDF",
-            type=["pdf"],
-            help=f"PDF tối đa {MAX_PDF_BYTES // (1024 * 1024)} MB.",
+        uploaded_files = st.file_uploader(
+            "Tải file tài liệu",
+            type=["pdf", "docx", "doc", "txt"],
+            help=f"Hỗ trợ PDF, DOCX, DOC, TXT. Tối đa {MAX_PDF_BYTES // (1024 * 1024)} MB mỗi file.",
             label_visibility="collapsed",
+            accept_multiple_files=True,
         )
         st.markdown(
-            '<p class="upload-note">Kéo–thả hoặc chọn file. Hiển thị tiến trình khi phân tích.</p>',
+            '<p class="upload-note">Kéo–thả hoặc chọn nhiều file PDF, DOCX, DOC, TXT. Hiển thị tiến trình khi phân tích.</p>',
             unsafe_allow_html=True,
         )
 
-        if uploaded_file is None:
-            st.info("Vui lòng chọn file PDF để bắt đầu.")
+        if not uploaded_files:
+            st.info("Vui lòng chọn file tài liệu (PDF, DOCX, DOC, TXT) để bắt đầu.")
             return
 
-        size = getattr(uploaded_file, "size", None) or 0
-        if size > MAX_PDF_BYTES:
-            st.error(f"File vượt quá {MAX_PDF_BYTES // (1024 * 1024)} MB. Chọn file nhỏ hơn.")
+        # Kiểm tra kích thước từng file
+        valid_files = []
+        for uploaded_file in uploaded_files:
+            size = getattr(uploaded_file, "size", None) or 0
+            if size > MAX_PDF_BYTES:
+                st.warning(f"File **{uploaded_file.name}** vượt quá {MAX_PDF_BYTES // (1024 * 1024)} MB, bỏ qua.")
+            else:
+                valid_files.append(uploaded_file)
+        
+        if not valid_files:
+            st.error("Không có file hợp lệ để xử lý.")
             return
 
-        st.session_state.uploaded_filename = uploaded_file.name
-        st.success(f"Đã chọn: **{uploaded_file.name}**")
+        # Hiển thị danh sách file đã chọn
+        file_names = ", ".join([f.name for f in valid_files])
+        st.session_state.uploaded_filename = file_names
+        st.success(f"Đã chọn {len(valid_files)} file: **{file_names}**")
 
-        if st.session_state.vector_ready:
-            st.success(f"Sẵn sàng hỏi đáp: {uploaded_file.name}")
+        if st.session_state.vector_ready and st.session_state.processing_done:
+            st.success(f"Sẵn sàng hỏi đáp với {len(valid_files)} tài liệu")
             return
 
         if st.button("Bắt đầu phân tích tài liệu", type="secondary",
                      use_container_width=True, key="btn_process_doc"):
-            with st.spinner("Đang đọc và vector hóa tài liệu…"):
-                chunks = _parse_and_split(uploaded_file)
-                if not chunks:
-                    st.error("Không đọc được nội dung từ file PDF. Vui lòng thử file khác.")
-                    return
-                ok, msg = st.session_state.rag_controller.process_new_document(chunks)
+            all_chunks = []
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            for idx, uploaded_file in enumerate(valid_files):
+                status_text.text(f"Đang xử lý file {idx + 1}/{len(valid_files)}: {uploaded_file.name}...")
+                try:
+                    chunks = _parse_and_split(uploaded_file)
+                    if chunks:
+                        all_chunks.extend(chunks)
+                        logger.info(f"✅ Đã xử lý {uploaded_file.name}: {len(chunks)} chunks")
+                    else:
+                        st.warning(f"Không đọc được nội dung từ {uploaded_file.name}")
+                except Exception as e:
+                    st.warning(f"Lỗi khi xử lý {uploaded_file.name}: {str(e)}")
+                
+                progress_bar.progress((idx + 1) / len(valid_files))
+            
+            status_text.text("Đang vector hóa tất cả tài liệu...")
+            
+            if not all_chunks:
+                st.error("Không đọc được nội dung từ bất kỳ file nào. Vui lòng thử lại.")
+                return
+            
+            try:
+                ok, msg = st.session_state.rag_controller.process_new_document(all_chunks)
+            except Exception as e:
+                st.error(f"Lỗi khi lưu vào database: {str(e)}")
+                return
 
             if ok:
                 st.session_state.vector_ready = True
                 st.session_state.processing_done = True
-                st.success(f"Xử lý xong {len(chunks)} chunks. Bạn có thể đặt câu hỏi!")
+                
+                # Lưu thông tin file vào cuộc hội thoại hiện tại
+                active_id = st.session_state.active_conversation_id
+                if active_id in st.session_state.conversations:
+                    # Đảm bảo uploaded_files tồn tại
+                    if "uploaded_files" not in st.session_state.conversations[active_id]:
+                        st.session_state.conversations[active_id]["uploaded_files"] = []
+                    
+                    # Thêm thông tin file mới
+                    for uploaded_file in valid_files:
+                        file_size_mb = uploaded_file.size / (1024 * 1024)
+                        file_info = {
+                            "name": uploaded_file.name,
+                            "size": f"{file_size_mb:.2f} MB",
+                            "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                        # Kiểm tra trùng lặp
+                        if not any(f["name"] == file_info["name"] for f in st.session_state.conversations[active_id]["uploaded_files"]):
+                            st.session_state.conversations[active_id]["uploaded_files"].append(file_info)
+                
+                st.success(f"Xử lý xong {len(all_chunks)} chunks từ {len(valid_files)} file. Bạn có thể đặt câu hỏi!")
             else:
                 st.error(msg)
 
@@ -401,18 +567,34 @@ def render_chat_section() -> None:
     if st.session_state.get("rag_controller") is None:
         st.error("Hệ thống AI chưa khởi tạo. Không thể hỏi đáp.")
         return
-    st.markdown('<p class="section-title">Hỏi đáp tài liệu</p>', unsafe_allow_html=True)
+    
+    # Lấy cuộc hội thoại hiện tại
+    active_id = st.session_state.active_conversation_id
+    active_conv = st.session_state.conversations.get(active_id, {"name": "Unknown", "messages": [], "uploaded_files": []})
+    
+    # Hiển thị tên cuộc hội thoại và số file
+    file_count = len(active_conv.get("uploaded_files", []))
+    title = f'{active_conv["name"]} ({file_count} tài liệu)' if file_count > 0 else active_conv["name"]
+    st.markdown(f'<p class="section-title">{title}</p>', unsafe_allow_html=True)
+    
+    # Hiển thị danh sách file trong cuộc hội thoại này (dạng compact)
+    uploaded_files_list = active_conv.get("uploaded_files", [])
+    if uploaded_files_list:
+        with st.expander(f"Xem {len(uploaded_files_list)} tài liệu đã upload"):
+            for idx, file_info in enumerate(uploaded_files_list, 1):
+                st.text(f"{idx}. {file_info['name']} - {file_info['size']} - {file_info.get('uploaded_at', 'N/A')}")
 
     # Hiển thị lịch sử hội thoại
     selected = st.session_state.get("selected_chat_idx")
     chat_container = st.container(height=500)
     with chat_container:
-        if not st.session_state.chat_history:
+        current_messages = active_conv["messages"]
+        if not current_messages:
             st.markdown(
-                '<div class="answer-empty">Lịch sử hội thoại sẽ hiển thị tại đây.</div>',
+                '<div class="answer-empty">Bắt đầu cuộc hội thoại bằng cách đặt câu hỏi bên dưới.</div>',
                 unsafe_allow_html=True,
             )
-        for idx, msg in enumerate(st.session_state.chat_history):
+        for idx, msg in enumerate(current_messages):
             # Anchor để scroll đến
             st.markdown(f'<div id="chat-msg-{idx}"></div>', unsafe_allow_html=True)
 
@@ -476,21 +658,29 @@ def render_chat_section() -> None:
         with st.spinner("Đang suy luận…"):
             filter_filename = st.session_state.get("cfg_filter_filename", "").strip()
             filter_dict = {"file_name": filter_filename} if filter_filename else None
+            
+            # Sử dụng active_conversation_id làm session_id
+            active_id = st.session_state.active_conversation_id
+            
             result = st.session_state.rag_controller.answer_question(
                 question=question.strip(),
-                session_id=st.session_state.session_id,
+                session_id=active_id,  # Mỗi cuộc hội thoại có session riêng
                 advanced_mode=advanced_mode,
                 filter_dict=filter_dict,
             )
         answer = result.get("answer", "")
         citations = _sources_to_citations(result.get("sources", []))
         confidence = result.get("confidence")
-        st.session_state.chat_history.append({
-            "question": question.strip(),
-            "answer": answer,
-            "citations": citations,
-            "confidence": confidence if isinstance(confidence, (int, float)) else None,
-        })
+        
+        # Lưu vào cuộc hội thoại hiện tại
+        if active_id in st.session_state.conversations:
+            st.session_state.conversations[active_id]["messages"].append({
+                "question": question.strip(),
+                "answer": answer,
+                "citations": citations,
+                "confidence": confidence if isinstance(confidence, (int, float)) else None,
+            })
+        
         st.rerun()
 
 
@@ -501,7 +691,7 @@ def render_chat_section() -> None:
 def main() -> None:
     st.set_page_config(
         page_title="SmartDoc AI",
-        page_icon="📄",
+        page_icon="",
         layout="wide",
         initial_sidebar_state="expanded",
     )
