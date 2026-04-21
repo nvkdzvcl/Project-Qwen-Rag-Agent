@@ -475,5 +475,88 @@
         "usage_metadata": null
       }
     }
+  ],
+  "716e8772-4dea-4d60-8f44-9dc51a06518b": [
+    {
+      "type": "human",
+      "data": {
+        "content": "2 tài liệu trên nói về điều gì",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "Tài liệu đầu tiên nói về quy định xác định tương đương chức danh giáo viên theo Nghị định số 204/2004/ND-CP, bao gồm các điều khoản về công khai và tuân thủ pháp luật. Tài liệu thứ hai là đề bài thực hành về quản lý bán hàng trong cơ sở dữ liệu, giới thiệu các quan hệ như khách hàng, nhân viên, sản phẩm và hóa đơn.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    },
+    {
+      "type": "human",
+      "data": {
+        "content": "mục đích, nguyên tắc xác định chức danh nhà giáo",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "Mục đích của việc xác định chức danh nhà giáo là để đảm bảo công bằng khi phân配上教师职务，确保每名教师的职责和任务与新的工作岗位相符。原则上，确定教师职务时需要考虑其专业水平和发展需求，同时保证学校教育质量的持续提升。",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    },
+    {
+      "type": "human",
+      "data": {
+        "content": "mục đích, nguyên tắc thực hiện chức danh nhà giáo",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "Mục đích của việc xác định chức danh nhà giáo là để đảm bảo công bằng và minh bạch trong quá trình phân配上相应的教师职务，并确保每位教师的职责和任务与其新的工作岗位相符。原则上，确定教师职务时需要考虑其专业水平和发展需求，同时保证学校教育质量的持续提升。",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    }
   ]
 }
