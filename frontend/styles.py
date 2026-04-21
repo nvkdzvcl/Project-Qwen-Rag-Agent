@@ -117,14 +117,75 @@ def inject_global_styles() -> None:
 
             /* Sidebar history buttons */
             [data-testid="stSidebar"] .stButton > button {
-                border: 1px solid rgba(255, 255, 255, 0.25);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                background-color: rgba(255, 255, 255, 0.05);
                 color: var(--text-light) !important;
                 text-align: left !important;
                 font-size: 0.82rem !important;
-                padding: 4px 8px !important;
+                padding: 8px 12px !important;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                transition: all 0.2s ease;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-color: rgba(255, 255, 255, 0.3);
+            }
+            
+            /* Nút primary trong sidebar (+ Hội thoại mới) */
+            [data-testid="stSidebar"] .stButton > button[kind="primary"] {
+                background-color: var(--primary) !important;
+                border-color: var(--primary) !important;
+                color: #fff !important;
+                font-weight: 600 !important;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+                background-color: #0056b3 !important;
+                border-color: #0056b3 !important;
+            }
+            
+            /* Nút secondary trong sidebar (cuộc hội thoại active) */
+            [data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+                background-color: rgba(0, 123, 255, 0.15) !important;
+                border: 1px solid rgba(0, 123, 255, 0.4) !important;
+                color: #ffffff !important;
+                font-weight: 500 !important;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {
+                background-color: rgba(0, 123, 255, 0.25) !important;
+                border-color: rgba(0, 123, 255, 0.6) !important;
+            }
+            
+            /* Nút tertiary trong sidebar (cuộc hội thoại không active) */
+            [data-testid="stSidebar"] .stButton > button[kind="tertiary"] {
+                background-color: rgba(255, 255, 255, 0.03) !important;
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                color: rgba(255, 255, 255, 0.85) !important;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button[kind="tertiary"]:hover {
+                background-color: rgba(255, 255, 255, 0.08) !important;
+                border-color: rgba(255, 255, 255, 0.2) !important;
+                color: #ffffff !important;
+            }
+            
+            /* Nút xóa (X) - màu đỏ nhẹ */
+            [data-testid="stSidebar"] .stButton > button[key*="del_"] {
+                background-color: rgba(220, 53, 69, 0.1) !important;
+                border: 1px solid rgba(220, 53, 69, 0.3) !important;
+                color: #ff6b6b !important;
+                padding: 4px 8px !important;
+                font-size: 0.9rem !important;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button[key*="del_"]:hover {
+                background-color: rgba(220, 53, 69, 0.2) !important;
+                border-color: rgba(220, 53, 69, 0.5) !important;
+                color: #ff5252 !important;
             }
 
             /* Checkbox trong sidebar — label trắng, box sáng */
@@ -369,6 +430,14 @@ def inject_global_styles() -> None:
                 background-color: var(--primary) !important;
                 border-color: var(--primary) !important;
                 color: #fff !important;
+                font-weight: 600 !important;
+                transition: all 0.2s ease;
+            }
+            
+            .stButton > button[kind="primary"]:hover {
+                background-color: #0056b3 !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
             }
 
             .stButton > button[kind="secondary"] {
@@ -376,6 +445,13 @@ def inject_global_styles() -> None:
                 border-color: var(--secondary) !important;
                 color: #1f2d3d !important;
                 font-weight: 600 !important;
+                transition: all 0.2s ease;
+            }
+            
+            .stButton > button[kind="secondary"]:hover {
+                background-color: #ffb300 !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
             }
 
             /* Modal confirm overlay */
