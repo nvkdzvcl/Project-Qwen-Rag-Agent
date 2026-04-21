@@ -1,4 +1,4 @@
-"""CSS toàn cục SmartDoc AI — một nơi chỉnh palette và layout."""
+"""Global CSS cho giao diện Streamlit."""
 
 
 def inject_global_styles() -> None:
@@ -8,473 +8,295 @@ def inject_global_styles() -> None:
         """
         <style>
             :root {
-                --primary: #007BFF;
-                --secondary: #FFC107;
-                --bg-main: #F8F9FA;
-                --bg-sidebar: #2C2F33;
-                --text-main: #212529;
-                --text-light: #FFFFFF;
-                /* Kích thước cố định / giới hạn — responsive qua clamp & max-width */
-                --content-max: 1120px;
-                --workflow-step-width: clamp(140px, 18vw, 200px);
-                --workflow-step-min-h: 128px;
-                --upload-zone-min-h: 152px;
-                --banner-min-h: 168px;
-                --section-gap: 1rem;
+                --ink-900: #0e1117;
+                --ink-700: #2c3342;
+                --ink-500: #546179;
+                --line: #d9e0ec;
+                --surface: #ffffff;
+                --surface-soft: #f4f7fc;
+                --brand: #0f4c81;
+                --accent: #f0b429;
+                --ok: #1f8b4c;
             }
 
             .stApp {
-                background-color: var(--bg-main);
-                color: var(--text-main);
-                overflow-x: hidden !important;
+                background:
+                    radial-gradient(circle at 0% 0%, #e9f1ff 0%, transparent 28%),
+                    radial-gradient(circle at 100% 0%, #fff2d3 0%, transparent 20%),
+                    #f3f6fb;
+                color: var(--ink-900);
             }
 
-            /* Vùng nội dung chính: không tràn ngang, căn giữa trên màn lớn */
             section[data-testid="stMain"] .block-container {
-                max-width: min(var(--content-max), calc(100vw - 2rem)) !important;
-                padding-left: max(0.75rem, env(safe-area-inset-left)) !important;
-                padding-right: max(0.75rem, env(safe-area-inset-right)) !important;
-                padding-top: 0.5rem !important;
-                padding-bottom: 1.5rem !important;
+                max-width: 1080px;
+                padding-top: 1.1rem;
+                padding-bottom: 1.3rem;
             }
 
-            html, body,
-            [data-testid="stAppViewContainer"],
-            [data-testid="stMain"],
-            [data-testid="stMainBlockContainer"] {
-                overflow-x: hidden !important;
+            [data-testid="stSidebar"] {
+                background: linear-gradient(180deg, #0f1728 0%, #17263d 100%);
+                border-right: 1px solid rgba(255, 255, 255, 0.08);
             }
 
-            [data-testid="stSidebar"],
-            [data-testid="stSidebarContent"] {
-                background-color: var(--bg-sidebar) !important;
-                overflow-x: hidden !important;
+            .side-brand {
+                padding: 0.35rem 0.2rem 0.5rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+                margin-bottom: 0.8rem;
             }
 
-            /* Chữ sidebar: trắng — trừ widget có nền sáng (select, …) */
-            [data-testid="stSidebar"] .stMarkdown,
-            [data-testid="stSidebar"] .stMarkdown p,
-            [data-testid="stSidebar"] .stMarkdown span,
-            [data-testid="stSidebar"] [data-testid="stCaption"] {
-                color: var(--text-light) !important;
+            .side-brand h2 {
+                margin: 0;
+                color: #f3f8ff;
+                font-size: 1.42rem;
+                letter-spacing: 0.3px;
+            }
+
+            .side-brand p {
+                margin: 0.3rem 0 0;
+                color: #a9bbd9;
+                font-size: 0.84rem;
             }
 
             [data-testid="stSidebar"] h1,
-            [data-testid="stSidebar"] h3 {
-                color: var(--text-light) !important;
+            [data-testid="stSidebar"] h2,
+            [data-testid="stSidebar"] h3,
+            [data-testid="stSidebar"] h4,
+            [data-testid="stSidebar"] p,
+            [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] span,
+            [data-testid="stSidebar"] .stCaption,
+            [data-testid="stSidebar"] .stMarkdown {
+                color: #eef3ff !important;
             }
 
-            [data-testid="stSidebar"] h2 {
-                color: var(--primary) !important;
-                font-size: clamp(1.4rem, 3vw, 1.75rem) !important;
-                font-weight: 700 !important;
-            }
-
-            /* Selectbox: nền trắng mặc định → chữ tối; nhãn widget vẫn trắng trên nền sidebar */
-            [data-testid="stSidebar"] [data-testid="stSelectbox"] label {
-                color: var(--text-light) !important;
-            }
-
-            /* Selectbox model — highlight nền xanh primary */
-            [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] {
-                background-color: #e8f4ff !important;
-                border: 2px solid var(--primary) !important;
-                border-radius: 8px !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *,
-            [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *::placeholder {
-                color: var(--text-main) !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stSelectbox"] svg {
-                fill: var(--text-main) !important;
-            }
-
-            /* Một số bản Streamlit dùng combobox / không có baseweb */
-            [data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"],
-            [data-testid="stSidebar"] [data-testid="stSelectbox"] [role="listbox"] {
-                color: var(--text-main) !important;
-                background-color: #ffffff !important;
-            }
-
-            /* Slider: nhãn & giá trị đọc được trên nền tối */
-            [data-testid="stSidebar"] [data-testid="stSlider"] label,
-            [data-testid="stSidebar"] [data-testid="stSlider"] .stMarkdown,
-            [data-testid="stSidebar"] [data-testid="stSlider"] .stMarkdown p,
-            [data-testid="stSidebar"] [data-testid="stSlider"] [data-testid="stTickBarMin"],
-            [data-testid="stSidebar"] [data-testid="stTickBarMax"] {
-                color: var(--text-light) !important;
-            }
-
-            .chat-highlight {
-                border-left: 3px solid var(--primary);
-                background: #f0f7ff;
-                border-radius: 8px;
-                padding: 4px 8px;
-                margin: 4px 0;
-            }
-
-            /* Sidebar history buttons */
             [data-testid="stSidebar"] .stButton > button {
-                border: 1px solid rgba(255, 255, 255, 0.25);
-                color: var(--text-light) !important;
-                text-align: left !important;
-                font-size: 0.82rem !important;
-                padding: 4px 8px !important;
-                white-space: nowrap;
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                background: rgba(255, 255, 255, 0.06);
+                color: #eff5ff !important;
+                transition: all 0.2s ease;
+            }
+
+            [data-testid="stSidebar"] .stButton > button:hover {
+                border-color: rgba(255, 255, 255, 0.45);
+                background: rgba(255, 255, 255, 0.13);
+            }
+
+            [data-testid="stSidebar"] .stButton > button[kind="primary"] {
+                background: linear-gradient(135deg, #0f67b6 0%, #0d4f8e 100%);
+                border-color: #0f67b6;
+                color: #ffffff !important;
+            }
+
+            [data-testid="stSidebar"] input,
+            [data-testid="stSidebar"] textarea,
+            [data-testid="stSidebar"] [data-baseweb="select"] {
+                background: #f7faff !important;
+                color: #10151f !important;
+                border-radius: 10px !important;
+                border: 1px solid #c7d4ec !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stSlider"] [role="slider"] {
+                background: #f0b429 !important;
+            }
+
+            /* File uploader trong sidebar: giữ tương phản tốt cho cả light/dark */
+            [data-testid="stSidebar"] [data-testid="stFileUploader"] {
+                background: rgba(10, 20, 36, 0.42) !important;
+                border: 1px solid rgba(255, 255, 255, 0.14) !important;
+                border-radius: 12px !important;
+                padding: 0.58rem !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+                background: rgba(5, 12, 24, 0.9) !important;
+                border: 1px dashed rgba(255, 255, 255, 0.34) !important;
+                border-radius: 10px !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
+                color: #eef4ff !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stFileUploader"] small,
+            [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stCaptionContainer"],
+            [data-testid="stSidebar"] [data-testid="stFileUploader"] [data-testid="stFileUploaderFileName"] {
+                color: #e6eeff !important;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stFileUploader"] button {
+                border-radius: 9px !important;
+                border: 1px solid rgba(255, 255, 255, 0.22) !important;
+                background: rgba(255, 255, 255, 0.12) !important;
+                color: #f4f8ff !important;
+            }
+
+            .doc-chip {
+                border: 1px solid rgba(255, 255, 255, 0.28);
+                border-radius: 999px;
+                padding: 0.25rem 0.62rem;
+                font-size: 0.78rem;
+                margin-bottom: 0.36rem;
+                background: rgba(255, 255, 255, 0.08);
+                color: #f4f8ff;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
-            /* Checkbox trong sidebar — label trắng, box sáng */
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] label,
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] span,
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] p,
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] div,
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] label > div,
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] label > div > p {
-                color: #ffffff !important;
-                opacity: 1 !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] label span {
-                color: #ffffff !important;
-                opacity: 1 !important;
-            }
-
-            /* Ô vuông checkbox */
-            [data-testid="stSidebar"] [data-testid="stCheckbox"] input[type="checkbox"] {
-                accent-color: var(--primary) !important;
-                width: 16px !important;
-                height: 16px !important;
-            }
-
-            /* BaseWeb checkbox (Streamlit dùng baseweb) */
-            [data-testid="stSidebar"] [data-baseweb="checkbox"] span {
-                background-color: #ffffff !important;
-                border-color: #aaaaaa !important;
-            }
-
-            [data-testid="stSidebar"] [data-baseweb="checkbox"] [data-checked="true"] span,
-            [data-testid="stSidebar"] [data-baseweb="checkbox"] span[aria-checked="true"] {
-                background-color: var(--primary) !important;
-                border-color: var(--primary) !important;
-            }
-
-            [data-testid="stSidebar"] .stAlert {
-                color: var(--text-main) !important;
-            }
-
-            .stMarkdown, .stCaption, .stText, .stAlert,
-            .stTextInput, .stSelectbox, .stSlider {
-                overflow-wrap: anywhere;
-                word-break: break-word;
-            }
-
-            h1, h2, h3, h4, h5, h6 {
-                color: var(--text-main);
-            }
-
-            .main-header {
-                text-align: center;
-                color: var(--primary);
-                margin-top:3rem;
-                margin-bottom: 1rem;
-                border-bottom: 1px solid #e3e6ea;
-                padding-bottom: 0.75rem;
-            }
-
-            .main-header h1 {
-                font-size: clamp(1.35rem, 3.5vw, 1.85rem) !important;
-                line-height: 1.2;
-            }
-
-            .feature-section {
-                background: #ffffff;
-                border: 1px solid #dfe4ea;
+            .hero-card {
+                background:
+                    linear-gradient(110deg, rgba(15, 103, 182, 0.95) 0%, rgba(12, 58, 107, 0.96) 62%),
+                    linear-gradient(145deg, #0d62ad 0%, #0a3f74 100%);
                 border-radius: 18px;
-                padding: clamp(12px, 2vw, 18px);
-                box-shadow: 0 8px 24px rgba(15, 44, 84, 0.06);
-                margin-bottom: var(--section-gap);
-                width: 100%;
-                max-width: 100%;
-                box-sizing: border-box;
+                padding: 1.15rem 1.2rem;
+                color: #ffffff;
+                margin-bottom: 0.85rem;
+                box-shadow: 0 16px 34px rgba(9, 34, 68, 0.23);
             }
 
-            .workflow-flow {
-                display: flex;
-                align-items: stretch;
-                justify-content: center;
-                gap: clamp(6px, 1.5vw, 12px);
-                flex-wrap: wrap;
-                padding: 6px 0;
-                width: 100%;
+            .hero-card h1 {
+                margin: 0.12rem 0 0.4rem;
+                font-size: clamp(1.35rem, 2.8vw, 1.85rem);
+                line-height: 1.2;
+                color: #ffffff;
+                letter-spacing: 0.2px;
             }
 
-            .workflow-step {
-                background: #f8fbff;
-                border: 1px solid #dfe7f2;
-                border-radius: 14px;
-                padding: 14px 12px;
-                text-align: center;
-                box-sizing: border-box;
-                flex: 0 0 var(--workflow-step-width);
-                width: var(--workflow-step-width);
-                min-height: var(--workflow-step-min-h);
-                max-width: 100%;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
-            }
-
-            .workflow-step:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.08);
-            }
-
-            .workflow-step-arrow {
-                display: flex;
-                align-items: center;
-                color: var(--primary);
-                font-size: 1.4rem;
-                font-weight: 700;
-                flex: 0 0 auto;
-            }
-
-            .workflow-step h4 {
+            .hero-kicker {
                 margin: 0;
-                font-size: clamp(0.85rem, 2vw, 0.95rem);
-                color: var(--primary);
-            }
-
-            .workflow-step p {
-                margin-top: 6px;
-                color: #5b6d7a;
-                font-size: clamp(0.78rem, 1.8vw, 0.85rem);
-                line-height: 1.45;
-            }
-
-            .upload-banner {
-                text-align: center;
-                padding: clamp(16px, 3vw, 22px);
-                # background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
-                border: 1px solid #FFC107;
-                border-radius: 16px;
-                margin-bottom: 16px;
-                min-height: var(--banner-min-h);
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .upload-banner-icon {
-                font-size: clamp(26px, 5vw, 32px);
-                background: transparent;
-                color: #FFC107;
-                border: 2.5px solid #FFC107;
-                width: clamp(52px, 12vw, 64px);
-                height: clamp(52px, 12vw, 64px);
-                flex-shrink: 0;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 50%;
-                margin-bottom: 12px;
-                box-shadow: 0 4px 14px rgba(255, 193, 7, 0.3);
-            }
-
-            .upload-banner-title {
-                font-size: clamp(1rem, 2.5vw, 1.1rem);
+                font-size: 0.76rem;
+                letter-spacing: 0.6px;
+                text-transform: uppercase;
+                color: #ffd56e;
                 font-weight: 700;
-                color: #1f4068;
-                margin-bottom: 6px;
             }
 
-            .upload-banner-desc {
-                font-size: clamp(0.82rem, 2vw, 0.9rem);
-                color: #5b6d81;
-                max-width: min(440px, 100%);
-                margin: 0 auto;
-                line-height: 1.5;
+            .hero-card p {
+                margin: 0;
+                color: #eaf2ff;
+                max-width: 760px;
             }
 
-            .upload-note {
-                color: #6c757d;
-                font-size: 0.88rem;
-                margin-top: 8px;
+            .hero-meta {
+                margin-top: 0.72rem;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.38rem;
             }
 
-            div[data-testid="stFileUploader"] {
-                background-color: #ffffff;
-                border: 1px solid #e0e6ed;
-                border-radius: 12px;
-                padding: 16px;
-                width: 100%;
-                max-width: 100%;
-                box-sizing: border-box;
+            .hero-meta span {
+                background: rgba(255, 255, 255, 0.18);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 999px;
+                padding: 0.17rem 0.56rem;
+                font-size: 0.76rem;
+                color: #ffffff;
             }
 
-            div[data-testid="stFileUploader"] section > label {
-                display: none;
-            }
-
-            div[data-testid="stFileUploaderDropzone"] {
-                border: 2px dashed #FFC107 !important;
-                background: #fff8e1 !important;
-                border-radius: 10px !important;
-                min-height: var(--upload-zone-min-h) !important;
-                box-sizing: border-box !important;
-            }
-
-            .citation-item {
-                background: #fffef4;
-                border-left: 4px solid var(--secondary);
-                padding: 0.5rem 0.75rem;
-                margin-bottom: 0.45rem;
-                border-radius: 0 8px 8px 0;
-                color: #4a4a4a;
-                font-size: 0.95rem;
-            }
-
-            /* Number input trong sidebar */
-            [data-testid="stSidebar"] [data-testid="stNumberInput"] label {
-                color: var(--text-light) !important;
-                font-size: 0.85rem !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stNumberInput"] input {
-                background-color: #ffffff !important;
-                color: var(--text-main) !important;
-                border: 1px solid #ced4da !important;
-                border-radius: 6px !important;
-                text-align: center !important;
-                font-weight: 600 !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stNumberInput"] button {
-                background-color: #3a3f44 !important;
-                color: var(--text-light) !important;
-                border: 1px solid rgba(255,255,255,0.2) !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover {
-                background-color: var(--primary) !important;
-            }
-
-            .stButton > button[kind="primary"] {
-                background-color: var(--primary) !important;
-                border-color: var(--primary) !important;
-                color: #fff !important;
-            }
-
-            .stButton > button[kind="secondary"] {
-                background-color: var(--secondary) !important;
-                border-color: var(--secondary) !important;
-                color: #1f2d3d !important;
-                font-weight: 600 !important;
-            }
-
-            /* Modal confirm overlay */
-            .modal-overlay {
-                background: rgba(0,0,0,0.18);
+            .empty-state {
+                background: var(--surface);
+                border: 1px solid var(--line);
                 border-radius: 14px;
-                padding: 1.5rem 1.25rem 0.5rem;
-                margin-bottom: 0.5rem;
-                border: 1px solid #e0e0e0;
+                padding: 1rem 1rem;
+                margin-bottom: 0.8rem;
+                box-shadow: 0 8px 20px rgba(12, 28, 52, 0.06);
             }
 
-            .modal-box {
-                background: #fff;
+            .empty-state h3 {
+                margin: 0;
+                color: var(--brand);
+                font-size: 1.04rem;
+            }
+
+            .empty-state p {
+                margin: 0.42rem 0 0;
+                color: var(--ink-500);
+                font-size: 0.9rem;
+            }
+
+            [data-testid="stChatMessage"] {
+                background: var(--surface);
+                border: 1px solid var(--line);
+                border-radius: 14px;
+                padding: 0.45rem 0.58rem;
+                box-shadow: 0 7px 18px rgba(21, 41, 71, 0.05);
+            }
+
+            /* Chống chữ bị chìm trong dark mode khi card chat nền sáng */
+            [data-testid="stChatMessage"] *,
+            [data-testid="stChatMessage"] p,
+            [data-testid="stChatMessage"] span,
+            [data-testid="stChatMessage"] li,
+            [data-testid="stChatMessage"] strong {
+                color: #1f2d3f !important;
+            }
+
+            .citation-row {
+                background: #fffdf6;
+                border: 1px solid #f5dd91;
+                border-left: 4px solid var(--accent);
                 border-radius: 10px;
-                padding: 1rem 1.25rem;
-                box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+                padding: 0.5rem 0.65rem;
+                margin-bottom: 0.45rem;
+                color: #2f3b4a;
+                font-size: 0.86rem;
             }
 
-            .modal-title {
-                font-size: 1rem;
-                font-weight: 600;
-                color: #333;
-                margin-bottom: 0.4rem;
+            .citation-row span {
+                color: #4d5b6d;
             }
 
-            .modal-body {
-                font-size: 0.88rem;
-                color: #666;
+            [data-testid="stExpander"] {
+                border-radius: 12px;
+                border: 1px solid var(--line);
+                background: #fafcff;
             }
 
-            /* Dialog popup — màu nhạt, nền trắng */
-            [data-testid="stDialog"] > div {
+            [data-testid="stExpander"] summary,
+            [data-testid="stExpander"] summary span,
+            [data-testid="stExpander"] summary p,
+            [data-testid="stExpander"] details > summary > div {
+                color: #1f2d3f !important;
+            }
+
+            [data-testid="stChatInput"] {
+                padding-top: 0.25rem;
+            }
+
+            /* Ô nhập chat luôn đọc được ở cả 2 theme */
+            [data-testid="stChatInput"] textarea,
+            [data-testid="stChatInput"] input {
                 background: #ffffff !important;
-                border-radius: 16px !important;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important;
+                color: #1f2d3f !important;
+                border: 1px solid #c9d4e7 !important;
             }
 
-            [data-testid="stDialog"] h2 {
-                color: #444 !important;
-                font-size: 1.05rem !important;
-                font-weight: 600 !important;
+            [data-testid="stChatInput"] textarea::placeholder,
+            [data-testid="stChatInput"] input::placeholder {
+                color: #6b778c !important;
             }
 
-            [data-testid="stDialog"] p {
-                color: #666 !important;
+            [data-testid="stChatInput"] button {
+                background: #0f67b6 !important;
+                color: #ffffff !important;
+                border: 1px solid #0f67b6 !important;
             }
 
-            [data-testid="stDialog"] .stButton > button[kind="primary"] {
-                background-color: #e05555 !important;
-                border-color: #e05555 !important;
-                color: #fff !important;
-            }
-
-            [data-testid="stDialog"] .stButton > button[kind="secondary"] {
-                background-color: #f0f0f0 !important;
-                border-color: #ddd !important;
-                color: #555 !important;
-            }
-
-            .section-title {
-                font-size: clamp(1rem, 2.4vw, 1.15rem);
-                font-weight: 600;
-                color: var(--text-main);
-                margin: 1.25rem 0 0.5rem 0;
-            }
-
-            /* Sidebar: chiều rộng ổn định, không bị co quá hẹp */
-            [data-testid="stSidebar"] {
-                min-width: min(280px, 100vw) !important;
-            }
-
-            @media (max-width: 900px) {
-                :root {
-                    --workflow-step-width: clamp(140px, 38vw, 200px);
-                }
-                .workflow-flow {
-                    justify-content: center;
-                }
-            }
-
-            @media (max-width: 640px) {
+            @media (max-width: 780px) {
                 section[data-testid="stMain"] .block-container {
-                    padding-left: 0.5rem !important;
-                    padding-right: 0.5rem !important;
+                    padding-left: 0.7rem;
+                    padding-right: 0.7rem;
                 }
-                .workflow-step-arrow {
-                    display: none;
+
+                .hero-card {
+                    border-radius: 14px;
+                    padding: 0.95rem 0.9rem;
                 }
-                .workflow-flow {
-                    flex-direction: column;
-                    align-items: stretch;
-                }
-                .workflow-step {
-                    flex: 1 1 auto !important;
-                    width: 100% !important;
-                    min-height: auto;
-                }
-                .feature-section {
-                    padding: 12px;
+
+                [data-testid="stSidebar"] {
+                    border-right: none;
                 }
             }
         </style>
