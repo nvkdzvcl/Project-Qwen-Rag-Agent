@@ -101,7 +101,7 @@ class RAGController:
             logger.error(f"❌ {error_msg}")
             return False, error_msg
 
-    def answer_question(self, question, session_id="default_session", filter_dict=None, advanced_mode=False):
+    def answer_question(self, question, session_id="default_session", filter_dict=None, advanced_mode=False, save_to_memory=True):
         """
         Hàm này Role 1 sẽ gọi khi người dùng đặt câu hỏi.
         Frontend chỉ cần định danh user bằng session_id.
@@ -121,13 +121,15 @@ class RAGController:
                 response = self.pipeline.ask_question_advanced(
                     question,
                     session_id=session_id,
-                    filter_dict=filter_dict
+                    filter_dict=filter_dict,
+                    save_to_memory=save_to_memory
                 )
             else:
                 response = self.pipeline.ask_question(
                     question,
                     session_id=session_id,
-                    filter_dict=filter_dict
+                    filter_dict=filter_dict,
+                    save_to_memory=save_to_memory
                 )
             return response
         
