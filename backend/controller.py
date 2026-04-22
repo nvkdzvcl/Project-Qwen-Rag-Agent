@@ -161,22 +161,6 @@ class RAGController:
         logger.info(f"Nhận API Request: Xóa Lịch sử Chat cho session '{session_id}'.")
         return self.pipeline.clear_session_history(session_id=session_id)
     
-    # ĐÃ BỔ SUNG: API để chạy Performance Benchmark (Câu 7)
-    def run_performance_benchmark(self, question):
-        """
-        Chạy so sánh tốc độ giữa Vector Search và Hybrid Search.
-        Có thể gắn vào một nút bấm ẩn trên UI dành cho giảng viên kiểm tra.
-        """
-        return self.pipeline.benchmark_hybrid_vs_vector(question)
-    
-    # ĐÃ BỔ SUNG: API để chạy Performance Benchmark Reranker (Câu 9)
-    def run_reranker_benchmark(self, question, filter_dict=None):
-        """
-        Đo lường độ trễ (latency) giữa Bi-encoder và Cross-encoder.
-        Đáp ứng tiêu chí so sánh hiệu năng của Câu 9.
-        """
-        return self.pipeline.benchmark_reranker_vs_bi_encoder(question, filter_dict)
-    
     # =========================================================
     # API HỖ TRỢ GIAO DIỆN (UI) TRÍCH XUẤT LOG
     # =========================================================
