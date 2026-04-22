@@ -104,8 +104,6 @@ def init_state() -> None:
         st.session_state.cfg_topk = 3
     if "cfg_model" not in st.session_state:
         st.session_state.cfg_model = "qwen2.5:3b"
-    if "cfg_filter_filename" not in st.session_state:
-        st.session_state.cfg_filter_filename = ""
     if "confirm_clear_vector" not in st.session_state:
         st.session_state.confirm_clear_vector = False
     if "selected_chat_idx" not in st.session_state:
@@ -295,15 +293,6 @@ def render_sidebar() -> None:
         st.number_input(
             "Top-k", min_value=1, max_value=20,
             value=st.session_state.cfg_topk, step=1, key="cfg_topk",
-        )
-        
-        # Metadata filter (Câu 8)
-        st.markdown("### Lọc tài liệu (tuỳ chọn)")
-        st.text_input(
-            "Chỉ tìm trong file",
-            placeholder="vd: chuong1.pdf",
-            key="cfg_filter_filename",
-            help="Để trống = tìm toàn bộ. Nhập tên file để lọc theo metadata.",
         )
 
         # Nút tạo cuộc hội thoại mới
@@ -663,9 +652,6 @@ def render_chat_section() -> None:
         placeholder="Nhập câu hỏi để so sánh Standard RAG vs Advanced RAG...",
     )
     if question and question.strip():
-        filter_filename = st.session_state.get("cfg_filter_filename", "").strip()
-        filter_dict = {"file_name": filter_filename} if filter_filename else None
-        
         # Sử dụng active_conversation_id làm session_id - CÙNG lịch sử cho cả 2
         active_id = st.session_state.active_conversation_id
         
@@ -675,7 +661,7 @@ def render_chat_section() -> None:
                 question=question.strip(),
                 session_id=active_id,
                 advanced_mode=False,
-                filter_dict=filter_dict,
+                filter_dict=None,  # Không lọc
                 save_to_memory=False  # Không lưu
             )
         
@@ -688,7 +674,7 @@ def render_chat_section() -> None:
                 question=question.strip(),
                 session_id=active_id,
                 advanced_mode=True,
-                filter_dict=filter_dict,
+                filter_dict=None,  # Không lọc
                 save_to_memory=True  # Lưu vào memory
             )
         
