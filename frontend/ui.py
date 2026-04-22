@@ -104,8 +104,6 @@ def init_state() -> None:
         st.session_state.cfg_topk = 3
     if "cfg_model" not in st.session_state:
         st.session_state.cfg_model = "qwen2.5:3b"
-    if "cfg_advanced_mode" not in st.session_state:
-        st.session_state.cfg_advanced_mode = False
     if "cfg_filter_filename" not in st.session_state:
         st.session_state.cfg_filter_filename = ""
     if "confirm_clear_vector" not in st.session_state:
@@ -298,26 +296,7 @@ def render_sidebar() -> None:
             "Top-k", min_value=1, max_value=20,
             value=st.session_state.cfg_topk, step=1, key="cfg_topk",
         )
-        st.markdown('<div style="color: white;">', unsafe_allow_html=True)
-        st.checkbox(
-            "Advanced RAG (self-check + confidence)",
-            value=st.session_state.cfg_advanced_mode,
-            key="cfg_advanced_mode",
-            help="Bật để dùng luồng tự kiểm tra câu trả lời và trả về confidence score.",
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Badge trạng thái pipeline hiện tại
-        adv = st.session_state.cfg_advanced_mode
-        badge_color = "#28a745" if adv else "#007BFF"
-        badge_text = "Advanced RAG ✓" if adv else "Standard RAG"
-        st.markdown(
-            f'<div style="background:{badge_color};color:#fff;border-radius:6px;'
-            f'padding:4px 10px;font-size:0.78rem;text-align:center;margin-top:4px;">'
-            f'{badge_text} · Hybrid+Reranker</div>',
-            unsafe_allow_html=True,
-        )
-
+        
         # Metadata filter (Câu 8)
         st.markdown("### Lọc tài liệu (tuỳ chọn)")
         st.text_input(
@@ -495,11 +474,10 @@ def render_upload_section() -> None:
         st.session_state.uploaded_filename = file_names
         st.success(f"Đã chọn {len(valid_files)} file: **{file_names}**")
 
-        if st.session_state.vector_ready and st.session_state.processing_done:
-            st.success(f"Sẵn sàng hỏi đáp với {len(valid_files)} tài liệu")
-            return
-
-        if st.button("Bắt đầu phân tích tài liệu", type="secondary",
+        # Luôn hiển thị nút phân tích (cho phép upload thêm)
+        button_label = "Thêm tài liệu vào hệ thống" if st.session_state.vector_ready else "Bắt đầu phân tích tài liệu"
+        
+        if st.button(button_label, type="secondary",
                      use_container_width=True, key="btn_process_doc"):
             all_chunks = []
             progress_bar = st.progress(0)
@@ -605,27 +583,60 @@ def render_chat_section() -> None:
 
             with st.chat_message("user", avatar=AVATAR_USER):
                 st.write(msg["question"])
-            with st.chat_message("assistant", avatar=AVATAR_AI):
-                st.write(msg["answer"])
-                confidence = msg.get("confidence")
-                if isinstance(confidence, (int, float)):
-                    st.caption(f"Confidence: {float(confidence):.2f}")
-                cites = msg.get("citations", [])
-                if cites:
-                    with st.expander(f"{len(cites)} trích dẫn nguồn"):
-                        citations_html = '<div class="citations-wrap">'
-                        for i, c in enumerate(cites, start=1):
-                            citations_html += f"""
-                            <div class="citation-card">
-                                <div class="citation-top">
-                                    <span class="cite-index">{i}</span>
-                                    <span class="cite-page">Trang {c.get('page', '?')}</span>
-                                    <span class="cite-location">{c.get('location', '')}</span>
-                                </div>
-                                <blockquote class="cite-snippet">"{c.get('snippet', '')}"</blockquote>
-                            </div>"""
-                        citations_html += "</div>"
-                        st.markdown(citations_html, unsafe_allow_html=True)
+            
+            # Hiển thị 2 cột: Standard RAG vs Advanced RAG
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Standard RAG**")
+                with st.chat_message("assistant", avatar=AVATAR_AI):
+                    st.write(msg.get("answer_standard", msg.get("answer", "")))
+                    cites_std = msg.get("citations_standard", msg.get("citations", []))
+                    if cites_std:
+                        with st.expander(f"{len(cites_std)} trích dẫn nguồn"):
+                            citations_html = '<div class="citations-wrap">'
+                            for i, c in enumerate(cites_std, start=1):
+                                citations_html += f"""
+                                <div class="citation-card">
+                                    <div class="citation-top">
+                                        <span class="cite-index">{i}</span>
+                                        <span class="cite-page">Trang {c.get('page', '?')}</span>
+                                        <span class="cite-location">{c.get('location', '')}</span>
+                                    </div>
+                                    <blockquote class="cite-snippet">"{c.get('snippet', '')}"</blockquote>
+                                </div>"""
+                            citations_html += "</div>"
+                            st.markdown(citations_html, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown("**Advanced RAG**")
+                with st.chat_message("assistant", avatar=AVATAR_AI):
+                    st.write(msg.get("answer_advanced", msg.get("answer", "")))
+                    confidence = msg.get("confidence")
+                    if isinstance(confidence, (int, float)):
+                        st.caption(f"Confidence: {float(confidence):.2f}")
+                    
+                    # Hiển thị metadata của Advanced RAG
+                    advanced_meta = msg.get("advanced_meta", {})
+                    if advanced_meta.get("used_retry"):
+                        st.caption(f"🔄 Đã retry với query: {advanced_meta.get('better_query', 'N/A')}")
+                    
+                    cites_adv = msg.get("citations_advanced", msg.get("citations", []))
+                    if cites_adv:
+                        with st.expander(f"{len(cites_adv)} trích dẫn nguồn"):
+                            citations_html = '<div class="citations-wrap">'
+                            for i, c in enumerate(cites_adv, start=1):
+                                citations_html += f"""
+                                <div class="citation-card">
+                                    <div class="citation-top">
+                                        <span class="cite-index">{i}</span>
+                                        <span class="cite-page">Trang {c.get('page', '?')}</span>
+                                        <span class="cite-location">{c.get('location', '')}</span>
+                                    </div>
+                                    <blockquote class="cite-snippet">"{c.get('snippet', '')}"</blockquote>
+                                </div>"""
+                            citations_html += "</div>"
+                            st.markdown(citations_html, unsafe_allow_html=True)
 
             if is_selected:
                 st.markdown('</div>', unsafe_allow_html=True)
@@ -641,9 +652,6 @@ def render_chat_section() -> None:
             )
 
     # Ô nhập câu hỏi — st.chat_input tự dính cứng dưới màn hình
-    advanced_mode = bool(st.session_state.cfg_advanced_mode)
-    mode_label = "Advanced RAG" if advanced_mode else "Standard RAG"
-
     if not st.session_state.vector_ready:
         st.markdown(
             '<p class="qa-hint"> Cần phân tích tài liệu trước khi đặt câu hỏi.</p>',
@@ -652,33 +660,53 @@ def render_chat_section() -> None:
         return
 
     question = st.chat_input(
-        placeholder=f"Nhập câu hỏi… ({mode_label})",
+        placeholder="Nhập câu hỏi để so sánh Standard RAG vs Advanced RAG...",
     )
     if question and question.strip():
-        with st.spinner("Đang suy luận…"):
-            filter_filename = st.session_state.get("cfg_filter_filename", "").strip()
-            filter_dict = {"file_name": filter_filename} if filter_filename else None
-            
-            # Sử dụng active_conversation_id làm session_id
-            active_id = st.session_state.active_conversation_id
-            
-            result = st.session_state.rag_controller.answer_question(
-                question=question.strip(),
-                session_id=active_id,  # Mỗi cuộc hội thoại có session riêng
-                advanced_mode=advanced_mode,
-                filter_dict=filter_dict,
-            )
-        answer = result.get("answer", "")
-        citations = _sources_to_citations(result.get("sources", []))
-        confidence = result.get("confidence")
+        filter_filename = st.session_state.get("cfg_filter_filename", "").strip()
+        filter_dict = {"file_name": filter_filename} if filter_filename else None
         
-        # Lưu vào cuộc hội thoại hiện tại
+        # Sử dụng active_conversation_id làm session_id - CÙNG lịch sử cho cả 2
+        active_id = st.session_state.active_conversation_id
+        
+        # Chạy Standard RAG trước - KHÔNG lưu vào memory
+        with st.spinner("Đang chạy Standard RAG..."):
+            result_standard = st.session_state.rag_controller.answer_question(
+                question=question.strip(),
+                session_id=active_id,
+                advanced_mode=False,
+                filter_dict=filter_dict,
+                save_to_memory=False  # Không lưu
+            )
+        
+        answer_standard = result_standard.get("answer", "")
+        citations_standard = _sources_to_citations(result_standard.get("sources", []))
+        
+        # Chạy Advanced RAG sau - LÀM lưu vào memory (chỉ lưu 1 lần)
+        with st.spinner("Đang chạy Advanced RAG (self-check + retry)..."):
+            result_advanced = st.session_state.rag_controller.answer_question(
+                question=question.strip(),
+                session_id=active_id,
+                advanced_mode=True,
+                filter_dict=filter_dict,
+                save_to_memory=True  # Lưu vào memory
+            )
+        
+        answer_advanced = result_advanced.get("answer", "")
+        citations_advanced = _sources_to_citations(result_advanced.get("sources", []))
+        confidence = result_advanced.get("confidence")
+        advanced_meta = result_advanced.get("advanced_meta", {})
+        
+        # Lưu vào cuộc hội thoại hiện tại với cả 2 kết quả
         if active_id in st.session_state.conversations:
             st.session_state.conversations[active_id]["messages"].append({
                 "question": question.strip(),
-                "answer": answer,
-                "citations": citations,
+                "answer_standard": answer_standard,
+                "citations_standard": citations_standard,
+                "answer_advanced": answer_advanced,
+                "citations_advanced": citations_advanced,
                 "confidence": confidence if isinstance(confidence, (int, float)) else None,
+                "advanced_meta": advanced_meta,
             })
         
         st.rerun()

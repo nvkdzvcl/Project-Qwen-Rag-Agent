@@ -604,7 +604,7 @@ class RagPipeline:
         confidence = max(0.05, min(0.99, confidence))
         return round(confidence, 2)
 
-    def ask_question(self, question: str, session_id: str = "default_session", filter_dict: dict = None) -> dict:
+    def ask_question(self, question: str, session_id: str = "default_session", filter_dict: dict = None, save_to_memory: bool = True) -> dict:
         """
         Hàm chính để Role 1 gọi từ giao diện.
         Frontend chỉ cần truyền session_id, Backend sẽ tự quản lý Chat History.
@@ -629,13 +629,15 @@ class RagPipeline:
             # =========================================================
             logger.info(f"🔍 Retrieved {len(source_documents)} documents để làm ngữ cảnh trả lời.")
             
-            # ĐÃ BỔ SUNG: Backend tự động ghi nhớ câu hỏi và câu trả lời vào Memory
-            self.backend_session_memory[session_id].append(HumanMessage(content=question))
-            self.backend_session_memory[session_id].append(AIMessage(content=answer))
-
-            self._save_chat_history()
+            # ĐÃ BỔ SUNG: Backend tự động ghi nhớ câu hỏi và câu trả lời vào Memory (nếu save_to_memory=True)
+            if save_to_memory:
+                self.backend_session_memory[session_id].append(HumanMessage(content=question))
+                self.backend_session_memory[session_id].append(AIMessage(content=answer))
+                self._save_chat_history()
+                logger.info(f"✅ Đã nhận phản hồi (Độ dài: {len(answer)} ký tự) và cập nhật Backend Memory thành công.")
+            else:
+                logger.info(f"✅ Đã nhận phản hồi (Độ dài: {len(answer)} ký tự). Không lưu vào memory (save_to_memory=False).")
             
-            logger.info(f"✅ Đã nhận phản hồi (Độ dài: {len(answer)} ký tự) và cập nhật Backend Memory thành công.")
             return {
                 "answer": answer,
                 "sources": self._extract_metadata(source_documents)
@@ -645,7 +647,7 @@ class RagPipeline:
             logger.error(f"❌ Lỗi trong quá trình hội thoại: {str(e)}")
             return {"answer": f"Lỗi hệ thống: {str(e)}", "sources": []}
 
-    def ask_question_advanced(self, question: str, session_id: str = "default_session", filter_dict: dict = None) -> dict:
+    def ask_question_advanced(self, question: str, session_id: str = "default_session", filter_dict: dict = None, save_to_memory: bool = True) -> dict:
         """
         Luồng Advanced RAG:
         1) Truy vấn RAG chuẩn
@@ -723,14 +725,21 @@ class RagPipeline:
                 self_check_conf=self_check.get("confidence")
             )
 
-            self.backend_session_memory[session_id].append(HumanMessage(content=question))
-            self.backend_session_memory[session_id].append(AIMessage(content=answer))
-            self._save_chat_history()
-
-            logger.info(
-                f"✅ [Advanced] Hoàn tất trả lời. Confidence={confidence} | "
-                f"used_retry={used_retry}"
-            )
+            # Lưu vào memory nếu save_to_memory=True
+            if save_to_memory:
+                self.backend_session_memory[session_id].append(HumanMessage(content=question))
+                self.backend_session_memory[session_id].append(AIMessage(content=answer))
+                self._save_chat_history()
+                logger.info(
+                    f"✅ [Advanced] Hoàn tất trả lời. Confidence={confidence} | "
+                    f"used_retry={used_retry} | Đã lưu vào memory."
+                )
+            else:
+                logger.info(
+                    f"✅ [Advanced] Hoàn tất trả lời. Confidence={confidence} | "
+                    f"used_retry={used_retry} | Không lưu vào memory."
+                )
+            
             return {
                 "answer": answer,
                 "sources": self._extract_metadata(source_documents),
