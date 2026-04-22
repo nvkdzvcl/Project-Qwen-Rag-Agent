@@ -582,6 +582,10 @@ class RagPipeline:
                 # Không dùng `if raw_scores:` nữa để tránh lỗi Ambiguous Truth Value
                 # =========================================================
                 if raw_scores is not None and len(raw_scores) > 0:
+                    logger.info("📊 [Self-Check] Reranker đang chấm điểm Relevance cho Top 3 Chunks:")
+                    for idx, score in enumerate(raw_scores):
+                        logger.info(f"   🔸 Chunk {idx + 1}: {float(score):.4f} điểm")
+                        
                     relevance_score = sum(
                         max(0.0, min(1.0, float(score))) for score in raw_scores
                     ) / len(raw_scores)
@@ -787,6 +791,11 @@ class RagPipeline:
         """
         sources = []
         seen_chunks = set()
+        
+        # =========================================================
+        # ĐÃ BỔ SUNG LOGGING: In bảng xếp hạng tài liệu
+        # =========================================================
+        logger.info("📋 [KẾT QUẢ XẾP HẠNG] Các tài liệu được chọn làm Ngữ cảnh (Context):")
 
         for idx, doc in enumerate(source_docs):
             # Xử lý số trang an toàn
@@ -795,6 +804,15 @@ class RagPipeline:
             
             raw_source = doc.metadata.get("source", "Tài liệu không tên")
             file_name = raw_source.split("/")[-1].split("\\")[-1] 
+
+            # =========================================================
+            # ĐÃ BỔ SUNG LOGGING: In điểm Reranker hoặc Rank Hybrid
+            # =========================================================
+            reranker_score = doc.metadata.get("relevance_score")
+            if reranker_score is not None:
+                logger.info(f"   🏆 Hạng {idx + 1} | Điểm Reranker: {float(reranker_score):.4f} | File: {file_name} (Trang {display_page})")
+            else:
+                logger.info(f"   🏅 Hạng {idx + 1} | Bầu chọn bởi Hybrid (BM25+FAISS) | File: {file_name} (Trang {display_page})")
 
             # Tạo ID duy nhất dựa trên NỘI DUNG CHUNK
             chunk_hash = hash(doc.page_content)
@@ -905,6 +923,7 @@ class RagPipeline:
             hyb_score_avg = 0.0
             
             # Tận dụng thuật toán Cross-Encoder (như một Giám khảo độc lập) để chấm điểm
+            # Tận dụng thuật toán Cross-Encoder (như một Giám khảo độc lập) để chấm điểm
             if getattr(self, 'cross_encoder_model', None) is not None:
                 logger.info("🧠 Đang dùng AI (Cross-Encoder) để chấm điểm chất lượng ngữ cảnh (Relevance Score)...")
                 
@@ -912,12 +931,22 @@ class RagPipeline:
                 if vec_docs:
                     vec_pairs = [[question, doc.page_content] for doc in vec_docs]
                     vec_scores = self.cross_encoder_model.score(vec_pairs)
+                    
+                    logger.info("📊 [Benchmark Q7] Điểm Giám khảo cho nhóm Pure Vector:")
+                    for idx, score in enumerate(vec_scores):
+                        logger.info(f"   🔸 Chunk {idx + 1}: {float(score):.4f} điểm")
+                        
                     vec_score_avg = sum(vec_scores) / len(vec_scores)
                 
                 # Chấm điểm tập tài liệu do Hybrid Search tìm được
                 if hyb_docs:
                     hyb_pairs = [[question, doc.page_content] for doc in hyb_docs]
                     hyb_scores = self.cross_encoder_model.score(hyb_pairs)
+                    
+                    logger.info("📊 [Benchmark Q7] Điểm Giám khảo cho nhóm Hybrid (BM25+FAISS):")
+                    for idx, score in enumerate(hyb_scores):
+                        logger.info(f"   🔸 Chunk {idx + 1}: {float(score):.4f} điểm")
+                        
                     hyb_score_avg = sum(hyb_scores) / len(hyb_scores)
             else:
                 logger.warning("⚠️ Không có mô hình Cross-Encoder để chấm điểm. Chỉ có thể đo lường tốc độ.")
@@ -1010,6 +1039,11 @@ class RagPipeline:
                 if cross_docs:
                     cross_pairs = [[question, doc.page_content] for doc in cross_docs]
                     cross_scores = self.cross_encoder_model.score(cross_pairs)
+                    
+                    logger.info("📊 [Benchmark Q9] Điểm Cross-Encoder chi tiết cho từng Chunk:")
+                    for idx, score in enumerate(cross_scores):
+                        logger.info(f"   🔸 Chunk {idx + 1}: {float(score):.4f} điểm")
+                        
                     cross_score_avg = sum(cross_scores) / len(cross_scores)
             
             # ==========================================

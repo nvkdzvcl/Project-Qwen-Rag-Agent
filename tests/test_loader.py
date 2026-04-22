@@ -7,22 +7,22 @@ from colorama import Fore, Style, init
 # CẤU HÌNH BIẾN TOÀN CỤC ĐỂ TEST
 # =========================================================
 # Thay bằng tên file PDF thông thường, PDF scan hoặc Docx bạn muốn soi
-TARGET_FILE = "TH2 - HQTCSDL - QL ban hang.pdf"  # Ví dụ: "test1.pdf", "testocr.pdf", "ND1_TTHCM.docx"
+TARGET_FILE = "testocr.pdf"  # Ví dụ: "test1.pdf", "testocr.pdf", "ND1_TTHCM.docx"
 # =========================================================
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 try:
-    from backend.loader import SmartDocLoader
+   from backend.loader_tesseract import SmartDocLoaderTesseract
 except ImportError:
-    print(Fore.RED + "Lỗi: Không tìm thấy backend/loader.py.")
+    print(Fore.RED + "Lỗi: Không tìm thấy backend/loader_tesseract.py.")
     sys.exit(1)
 
 init(autoreset=True)
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 def run_test():
-    loader = SmartDocLoader()
+    loader = SmartDocLoaderTesseract()
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     data_dir = os.path.join(base_dir, "test_data")
     file_path = os.path.join(data_dir, TARGET_FILE)

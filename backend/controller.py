@@ -140,66 +140,6 @@ class RAGController:
         except Exception as e:
             logger.error(f"❌ Lỗi không xác định khi truy vấn: {str(e)}", exc_info=True)
             return {"answer": f"⚠️ Lỗi xử lý câu hỏi. Chi tiết: {str(e)}", "sources": []}
-        
-    def answer_question_compare(self, question, session_id="compare_session", filter_dict=None):
-        """
-        Chạy so sánh song song giữa Standard RAG (Tốc độ) và Advanced RAG/Self-RAG (Chính xác).
-        Hàm này trả về kết quả của cả 2 để UI vẽ thành 2 cột đối chiếu.
-        """
-        logger.info(f"⚖️ Bắt đầu chế độ COMPARE (So sánh 2 luồng RAG) cho câu hỏi: '{question}'")
-        
-        try:
-            if not self.pipeline.vector_store:
-                return {"answer": "Lỗi: Vui lòng upload tài liệu trước khi đặt câu hỏi!", "sources": []}
-            
-            logger.info(
-                f"Query: '{question}' | Filter: '{filter_dict}'"
-            )
-
-            # -------------------------------------------------
-            # LUỒNG 1: CHẠY RAG TIÊU CHUẨN (TỐC ĐỘ)
-            # -------------------------------------------------
-            logger.info("▶️ [COMPARE] Bắt đầu chạy luồng RAG Tiêu chuẩn...")
-            start_standard = time.time()
-            
-            res_standard = self.pipeline.ask_question(
-                question, session_id=f"{session_id}_std", filter_dict=filter_dict
-            )
-            
-            res_standard['processing_time'] = round(time.time() - start_standard, 2)
-            
-            # -------------------------------------------------
-            # XẢ RÁC RAM (CỨU CÁNH CHO MÁY 16GB)
-            # -------------------------------------------------
-            logger.info("🧹 Đang xả rác RAM/VRAM đệm để nhường tài nguyên cho luồng Advanced...")
-            gc.collect()
-            
-            # -------------------------------------------------
-            # LUỒNG 2: CHẠY ADVANCED RAG / SELF-RAG (CHẤT LƯỢNG)
-            # -------------------------------------------------
-            logger.info("▶️ [COMPARE] Bắt đầu chạy luồng Advanced RAG (Self-RAG)...")
-            start_advanced = time.time()
-            
-            res_advanced = self.pipeline.ask_question_advanced(
-                question, session_id=f"{session_id}_adv", filter_dict=filter_dict
-            )
-            
-            res_advanced['processing_time'] = round(time.time() - start_advanced, 2)
-            
-            logger.info("🎉 Đã hoàn tất chế độ COMPARE!")
-            
-            # Trả về cục Data tổng để Frontend hiển thị
-            return {
-                "standard_rag": res_standard,
-                "advanced_rag": res_advanced
-            }
-            
-        except ConnectionError as ce:
-            logger.error(f"❌ Lỗi kết nối LLM: {str(ce)}")
-            return {"answer": "⚠️ Lỗi: Không thể kết nối với Ollama. Vui lòng bật phần mềm Ollama!", "sources": []}
-        except Exception as e:
-            logger.error(f"❌ Lỗi không xác định khi truy vấn: {str(e)}", exc_info=True)
-            return {"answer": f"⚠️ Lỗi xử lý câu hỏi. Chi tiết: {str(e)}", "sources": []}
 
     # =========================================================
     # CÁC API HỖ TRỢ DỌN DẸP HỆ THỐNG (CÂU 3)
