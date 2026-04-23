@@ -34,6 +34,8 @@ AVATAR_AI   = str(_BASE / "images" / "AI.jpg")
 MODEL_LABELS = {
     "qwen2.5:3b": "qwen2.5:3b (it RAM, uu tien may yeu)",
     "qwen2.5:7b": "qwen2.5:7b (Q4_K_M - khuyen nghi)",
+    "qwen3.5:4b": "qwen3.5:4b (chat luong tot hon, RAM vua)",
+    "qwen3.5:9b": "qwen3.5:9b (de xuat cho RAM 16GB)",
 }
 MODEL_OPTIONS = list(MODEL_LABELS.keys())
 

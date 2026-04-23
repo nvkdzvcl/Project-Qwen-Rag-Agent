@@ -558,5 +558,117 @@
         "usage_metadata": null
       }
     }
+  ],
+  "ddae0781-ed06-4054-9d12-e41d6640dbf1": [
+    {
+      "type": "human",
+      "data": {
+        "content": "file này gồm bao nhiêu chương?",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "File này gồm 134 chương. Tuy nhiên, tôi chỉ dựa vào số trang bạn cung cấp mà không có thông tin chi tiết về tên hoặc nội dung của từng chương cụ thể.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    },
+    {
+      "type": "human",
+      "data": {
+        "content": "file VBHN Luật SHTT gồm bao nhiêu chương?/",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "File VBHN Luật Sở Hữu Trí Tuệ (SHTT) được nêu trong đoạn văn bản này gồm 8 chương. Cụ thể, các chương được đề cập là Chương VII về Bảo hộ bí mật kinh doanh, Chương VIII về Xác lập quyền sở hữu công nghiệp đối với sáng chế, kiểu dáng công nghiệp, thiết kế bố trí, nhãn hiệu, chỉ dẫn địa lý, cùng một số quy định chung khác.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    }
+  ],
+  "ecc073c0-47f2-4bdf-b0c4-78e6518858bf": [
+    {
+      "type": "human",
+      "data": {
+        "content": "chương 2 gồm bao nhiêu điều luật",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "Chương II có 3 điều luật: Điều 18 về Quyền tác giả, Điều 19 về Quyền nhân thân và Điều 63 về Điều kiện chung đối với kiểu dáng công nghiệp được bảo hộ.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    },
+    {
+      "type": "human",
+      "data": {
+        "content": "chương 2 điều 19 nói về gì?",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "human",
+        "name": null,
+        "id": null,
+        "example": false
+      }
+    },
+    {
+      "type": "ai",
+      "data": {
+        "content": "Chương II - Điều 19 quy định về Quyền nhân thân của tác giả, bao gồm các quyền như đặt tên cho tác phẩm, đứng tên thật hoặc bút danh trên tác phẩm, công bố tác phẩm hoặc cho phép người khác công bố tác phẩm, và bảo vệ sự toàn vẹn của tác phẩm.",
+        "additional_kwargs": {},
+        "response_metadata": {},
+        "type": "ai",
+        "name": null,
+        "id": null,
+        "example": false,
+        "tool_calls": [],
+        "invalid_tool_calls": [],
+        "usage_metadata": null
+      }
+    }
   ]
 }
